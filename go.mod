@@ -1,3 +1,3 @@
-module xperim
+module router
 
 go 1.22.5
