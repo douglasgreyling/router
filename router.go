@@ -195,13 +195,14 @@ func (r *Router) addNamedRoute(name, pattern, method string) {
 
 // generateRouteName creates a route name from path and HTTP method
 // Examples:
-//   GET /users -> users_index
-//   GET /users/:id -> users_show
-//   POST /users -> users_create
-//   PUT /users/:id -> users_update
-//   PATCH /users/:id -> users_update
-//   DELETE /users/:id -> users_destroy
-//   GET /api/v1/products/:id -> api_v1_products_show
+//
+//	GET /users -> users_index
+//	GET /users/:id -> users_show
+//	POST /users -> users_create
+//	PUT /users/:id -> users_update
+//	PATCH /users/:id -> users_update
+//	DELETE /users/:id -> users_destroy
+//	GET /api/v1/products/:id -> api_v1_products_show
 func generateRouteName(path, method string) string {
 	// Clean the path: remove leading/trailing slashes and parameters
 	path = strings.Trim(path, "/")
@@ -211,11 +212,11 @@ func generateRouteName(path, method string) string {
 
 	// Split path into segments
 	segments := strings.Split(path, "/")
-	
+
 	// Build base name from non-parameter segments
 	var baseParts []string
 	hasParams := false
-	
+
 	for _, segment := range segments {
 		if strings.HasPrefix(segment, ":") {
 			hasParams = true
@@ -226,13 +227,13 @@ func generateRouteName(path, method string) string {
 		cleanSegment := strings.ReplaceAll(segment, "-", "_")
 		baseParts = append(baseParts, cleanSegment)
 	}
-	
+
 	if len(baseParts) == 0 {
 		return "" // Path only has parameters
 	}
-	
+
 	baseName := strings.Join(baseParts, "_")
-	
+
 	// Determine action suffix based on method and whether path has parameters
 	var action string
 	switch method {
@@ -259,7 +260,7 @@ func generateRouteName(path, method string) string {
 	default:
 		action = strings.ToLower(method)
 	}
-	
+
 	return baseName + "_" + action
 }
 
@@ -455,6 +456,7 @@ func (r *Router) GenerateRoutes(packageName, outputFile string) error {
 // ServeConfig holds configuration for the Serve method
 type ServeConfig struct {
 	Addr             string
+	GenerateRoutes   bool
 	RoutesPackage    string
 	RoutesOutputFile string
 }
@@ -466,6 +468,15 @@ type ServeOption func(*ServeConfig)
 func WithAddr(addr string) ServeOption {
 	return func(c *ServeConfig) {
 		c.Addr = addr
+	}
+}
+
+// WithCodegen enables route helper code generation on server start.
+// By default, codegen runs automatically in development mode (when ROUTER_ENV != "production").
+// Use this option to explicitly control code generation behavior.
+func WithCodegen(enabled bool) ServeOption {
+	return func(c *ServeConfig) {
+		c.GenerateRoutes = enabled
 	}
 }
 
@@ -483,42 +494,53 @@ func WithRoutesOutputFile(file string) ServeOption {
 	}
 }
 
-// Serve starts the HTTP server with optional configuration
-// Defaults: addr=":3000", routesPackage="routes", routesOutputFile="routes/generated.go"
+// ListenAndServe starts the HTTP server on the specified address.
+// This is a thin wrapper around http.ListenAndServe for convenience.
+func (r *Router) ListenAndServe(addr string) error {
+	return http.ListenAndServe(addr, r)
+}
+
+// Serve starts the HTTP server with optional configuration and automatic route generation.
+// By default, route helpers are generated in development mode (ROUTER_ENV != "production").
+//
+// Defaults:
+//   - addr: ":3000"
+//   - generateRoutes: true in development, false in production
+//   - routesPackage: "routes"
+//   - routesOutputFile: "routes/generated.go"
+//
 // Usage:
 //
-//	r.Serve()                                              // Use all defaults
-//	r.Serve(WithAddr(":8080"))                             // Custom port only
-//	r.Serve(WithAddr(":8080"), WithRoutesPackage("myroutes")) // Multiple options
+//	r.Serve()                                    // Use all defaults
+//	r.Serve(WithAddr(":8080"))                   // Custom port
+//	r.Serve(WithCodegen(false))                  // Disable codegen
+//	r.Serve(WithAddr(":8080"), WithCodegen(true)) // Production with codegen
 func (r *Router) Serve(opts ...ServeOption) error {
+	env := os.Getenv("ROUTER_ENV")
+	isProduction := env == "production"
+
 	// Apply defaults
 	config := &ServeConfig{
 		Addr:             ":3000",
+		GenerateRoutes:   !isProduction, // Auto-generate in development
 		RoutesPackage:    "routes",
 		RoutesOutputFile: "routes/generated.go",
 	}
 
-	// Apply options
+	// Apply user options (can override defaults)
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	env := os.Getenv("ROUTER_ENV")
-	if env == "" {
-		env = "development"
-	}
-
-	if env != "production" {
-		fmt.Printf("Starting router in '%s' mode\n", env)
-		fmt.Println("Generating routes...")
+	// Generate route helpers if enabled
+	if config.GenerateRoutes {
+		fmt.Println("Generating route helpers...")
 		if err := r.GenerateRoutes(config.RoutesPackage, config.RoutesOutputFile); err != nil {
 			return fmt.Errorf("failed to generate routes: %w", err)
 		}
 		fmt.Println("Route generation complete!")
-	} else {
-		fmt.Printf("Starting router in %s mode\n", env)
 	}
 
 	fmt.Printf("Starting server on http://localhost%s\n", config.Addr)
-	return http.ListenAndServe(config.Addr, r)
+	return r.ListenAndServe(config.Addr)
 }

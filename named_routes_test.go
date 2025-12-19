@@ -10,6 +10,10 @@ func TestNamedRoutes(t *testing.T) {
 	r := New()
 
 	// Test with WithName option
+	r.Get("/users/:id", func(c *Context) error {
+		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
+	}, WithName("user_show"))
+
 	r.Get("/posts/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
 	}, WithName("post_show"))
