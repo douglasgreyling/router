@@ -163,7 +163,7 @@ func (r *Router) Resources(path string, controller Controller, opts ...ResourceO
 
 		// Generate route name like "todos_index", "todos_show", etc.
 		routeName := resourceName + "_" + string(route.action)
-		r.HandleNamed(route.method, route.path, handler, routeName, options.Middleware...)
+		r.Handle(route.method, route.path, handler, routeName, options.Middleware...)
 	}
 }
 

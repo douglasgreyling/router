@@ -105,13 +105,18 @@ func (r *Router) Use(middleware ...MiddlewareFunc) {
 	r.middleware = append(r.middleware, middleware...)
 }
 
-// Handle registers a new route with the given method and path
-func (r *Router) Handle(method, path string, handler HandlerFunc, middleware ...MiddlewareFunc) {
-	r.HandleNamed(method, path, handler, "", middleware...)
-}
-
-// HandleNamed registers a new named route with the given method and path
-func (r *Router) HandleNamed(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
+// Handle registers a new route with the given method and path.
+// A route name is automatically generated for path helper generation.
+// Use the HTTP method helpers (Get, Post, etc.) with WithName() for custom names.
+//
+// Panics if:
+//   - path does not begin with '/'
+//   - path contains duplicate parameter names (e.g., /users/:id/posts/:id)
+//
+// This method is intended for use during application startup. Panics are
+// deliberate to catch configuration errors early, preventing the application
+// from starting with invalid routes.
+func (r *Router) Handle(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
 	if path[0] != '/' {
 		panic("path must begin with '/'")
 	}
@@ -137,40 +142,53 @@ func (r *Router) HandleNamed(method, path string, handler HandlerFunc, name stri
 	}
 }
 
-// HTTP method helpers with type-safe options
+// Get registers a GET route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("GET", path, handler, name, middleware...)
+	r.Handle("GET", path, handler, name, middleware...)
 }
 
+// Post registers a POST route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("POST", path, handler, name, middleware...)
+	r.Handle("POST", path, handler, name, middleware...)
 }
 
+// Put registers a PUT route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("PUT", path, handler, name, middleware...)
+	r.Handle("PUT", path, handler, name, middleware...)
 }
 
+// Patch registers a PATCH route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("PATCH", path, handler, name, middleware...)
+	r.Handle("PATCH", path, handler, name, middleware...)
 }
 
+// Delete registers a DELETE route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("DELETE", path, handler, name, middleware...)
+	r.Handle("DELETE", path, handler, name, middleware...)
 }
 
+// Head registers a HEAD route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("HEAD", path, handler, name, middleware...)
+	r.Handle("HEAD", path, handler, name, middleware...)
 }
 
+// Options registers an OPTIONS route with optional name and middleware.
+// Panics on invalid paths (see Handle for details).
 func (r *Router) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("OPTIONS", path, handler, name, middleware...)
+	r.Handle("OPTIONS", path, handler, name, middleware...)
 }
 
 // addNamedRoute registers a named route for code generation
@@ -267,6 +285,18 @@ func (r *Router) addRoute(method, path string, handler HandlerFunc, middleware [
 	// Remove leading and trailing slashes, split path
 	path = strings.Trim(path, "/")
 	segments := strings.Split(path, "/")
+
+	// Validate no duplicate parameter names
+	paramNames := make(map[string]bool)
+	for _, segment := range segments {
+		if len(segment) > 0 && (segment[0] == ':' || segment[0] == '*') {
+			paramName := segment[1:]
+			if paramNames[paramName] {
+				panic(fmt.Sprintf("duplicate parameter name '%s' in route '%s %s'", paramName, method, path))
+			}
+			paramNames[paramName] = true
+		}
+	}
 
 	current := root
 	for i, segment := range segments {

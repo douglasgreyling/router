@@ -1,8 +1,10 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -333,5 +335,62 @@ func TestRoutePriority(t *testing.T) {
 
 	if w.Body.String() != "param" {
 		t.Errorf("Expected 'param', got '%s'", w.Body.String())
+	}
+}
+
+func TestDuplicateParameterNames(t *testing.T) {
+	r := New()
+
+	// This should panic because :id is used twice
+	defer func() {
+		if rec := recover(); rec == nil {
+			t.Error("Expected panic for duplicate parameter names")
+		} else {
+			msg := fmt.Sprint(rec)
+			if !strings.Contains(msg, "duplicate parameter name 'id'") {
+				t.Errorf("Expected panic message about 'id', got: %s", msg)
+			}
+		}
+	}()
+
+	r.Get("/users/:id/posts/:id", func(c *Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+}
+
+func TestDuplicateParameterNamesWithWildcard(t *testing.T) {
+	r := New()
+
+	// This should panic because :path and *path are both named "path"
+	defer func() {
+		if rec := recover(); rec == nil {
+			t.Error("Expected panic for duplicate parameter names")
+		} else {
+			msg := fmt.Sprint(rec)
+			if !strings.Contains(msg, "duplicate parameter name 'path'") {
+				t.Errorf("Expected panic message about 'path', got: %s", msg)
+			}
+		}
+	}()
+
+	r.Get("/files/:path/*path", func(c *Context) error {
+		return c.String(http.StatusOK, "OK")
+	})
+}
+
+func TestUniqueParameterNames(t *testing.T) {
+	r := New()
+
+	// This should NOT panic - different parameter names
+	r.Get("/users/:user_id/posts/:post_id", func(c *Context) error {
+		return c.String(http.StatusOK, fmt.Sprintf("%s:%s", c.Param("user_id"), c.Param("post_id")))
+	})
+
+	req := httptest.NewRequest("GET", "/users/123/posts/456", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Body.String() != "123:456" {
+		t.Errorf("Expected '123:456', got '%s'", w.Body.String())
 	}
 }

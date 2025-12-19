@@ -23,13 +23,10 @@ func (g *Group) Use(middleware ...MiddlewareFunc) {
 	g.middleware = append(g.middleware, middleware...)
 }
 
-// Handle registers a route with the group's prefix and middleware
-func (g *Group) Handle(method, path string, handler HandlerFunc, middleware ...MiddlewareFunc) {
-	g.HandleNamed(method, path, handler, "", middleware...)
-}
-
-// HandleNamed registers a named route with the group's prefix and middleware
-func (g *Group) HandleNamed(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
+// Handle registers a route with the group's prefix and middleware.
+// A route name is automatically generated. Use HTTP method helpers with
+// WithName() for custom names.
+func (g *Group) Handle(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
 	fullPath := g.prefix + path
 
 	// Combine group middleware with route-specific middleware
@@ -37,43 +34,43 @@ func (g *Group) HandleNamed(method, path string, handler HandlerFunc, name strin
 	allMiddleware = append(allMiddleware, g.middleware...)
 	allMiddleware = append(allMiddleware, middleware...)
 
-	g.router.HandleNamed(method, fullPath, handler, name, allMiddleware...)
+	g.router.Handle(method, fullPath, handler, name, allMiddleware...)
 }
 
 // HTTP method helpers for groups with type-safe options
 func (g *Group) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("GET", path, handler, name, middleware...)
+	g.Handle("GET", path, handler, name, middleware...)
 }
 
 func (g *Group) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("POST", path, handler, name, middleware...)
+	g.Handle("POST", path, handler, name, middleware...)
 }
 
 func (g *Group) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("PUT", path, handler, name, middleware...)
+	g.Handle("PUT", path, handler, name, middleware...)
 }
 
 func (g *Group) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("PATCH", path, handler, name, middleware...)
+	g.Handle("PATCH", path, handler, name, middleware...)
 }
 
 func (g *Group) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("DELETE", path, handler, name, middleware...)
+	g.Handle("DELETE", path, handler, name, middleware...)
 }
 
 func (g *Group) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("HEAD", path, handler, name, middleware...)
+	g.Handle("HEAD", path, handler, name, middleware...)
 }
 
 func (g *Group) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	g.HandleNamed("OPTIONS", path, handler, name, middleware...)
+	g.Handle("OPTIONS", path, handler, name, middleware...)
 }
 
 // Group creates a nested group with combined prefix and middleware
@@ -128,7 +125,7 @@ func (g *Group) Resources(path string, controller Controller, opts ...ResourceOp
 		if handler != nil {
 			// Generate route name like "users_index", "users_show", etc.
 			routeName := resourceName + "_" + string(route.action)
-			g.router.HandleNamed(route.method, route.path, handler, routeName, options.Middleware...)
+			g.router.Handle(route.method, route.path, handler, routeName, options.Middleware...)
 		}
 	}
 }
