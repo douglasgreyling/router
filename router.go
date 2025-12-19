@@ -73,6 +73,7 @@ import (
 
 	"router/internal/naming"
 	"router/internal/tree"
+	"router/routehelper"
 )
 
 // HandlerFunc is the function signature for route handlers
@@ -274,7 +275,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // GenerateRoutes generates type-safe route helpers
 func (r *Router) GenerateRoutes(packageName, outputFile string) error {
-	cg := NewRouteHelperGenerator()
+	rh := routehelper.New()
 
 	// Get all named routes
 	namedRoutes := r.names.All()
@@ -283,9 +284,9 @@ func (r *Router) GenerateRoutes(packageName, outputFile string) error {
 	fmt.Printf("Generating route helpers for %d named routes...\n", len(namedRoutes))
 
 	for name, route := range namedRoutes {
-		cg.AddRoute(name, route.Pattern, route.Method)
+		rh.AddRoute(name, route.Pattern, route.Method)
 	}
-	return cg.Generate(packageName, outputFile)
+	return rh.Generate(packageName, outputFile)
 }
 
 // NamedRoutes returns all named routes (useful for testing and introspection)
