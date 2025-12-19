@@ -66,11 +66,8 @@ type Router struct {
 	// ErrorHandler handles errors returned from handlers
 	ErrorHandler func(*Context, error)
 
-	// Named routes for reverse routing (code generation only)
+	// Named routes for reverse routing and path helper generation
 	namedRoutes map[string]*namedRoute
-
-	// codegenMode indicates if router is in code generation mode (doesn't serve HTTP)
-	codegenMode bool
 }
 
 // namedRoute stores information about a named route
@@ -85,7 +82,6 @@ func New() *Router {
 	return &Router{
 		trees:       make(map[string]*node),
 		namedRoutes: make(map[string]*namedRoute),
-		codegenMode: false,
 		NotFound: func(c *Context) error {
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Not Found",
@@ -102,13 +98,6 @@ func New() *Router {
 			})
 		},
 	}
-}
-
-// NewForCodegen creates a router in code generation mode (doesn't serve HTTP)
-func NewForCodegen() *Router {
-	r := New()
-	r.codegenMode = true
-	return r
 }
 
 // Use adds global middleware to the router
@@ -471,10 +460,10 @@ func WithAddr(addr string) ServeOption {
 	}
 }
 
-// WithCodegen enables route helper code generation on server start.
-// By default, codegen runs automatically in development mode (when ROUTER_ENV != "production").
-// Use this option to explicitly control code generation behavior.
-func WithCodegen(enabled bool) ServeOption {
+// WithGenerateHelpers enables route helper code generation on server start.
+// By default, helpers are generated automatically in development mode (when ROUTER_ENV != "production").
+// Use this option to explicitly control route helper generation.
+func WithGenerateHelpers(enabled bool) ServeOption {
 	return func(c *ServeConfig) {
 		c.GenerateRoutes = enabled
 	}
@@ -511,10 +500,10 @@ func (r *Router) ListenAndServe(addr string) error {
 //
 // Usage:
 //
-//	r.Serve()                                    // Use all defaults
-//	r.Serve(WithAddr(":8080"))                   // Custom port
-//	r.Serve(WithCodegen(false))                  // Disable codegen
-//	r.Serve(WithAddr(":8080"), WithCodegen(true)) // Production with codegen
+//	r.Serve()                                          // Use all defaults
+//	r.Serve(WithAddr(":8080"))                         // Custom port
+//	r.Serve(WithGenerateHelpers(false))                // Disable helper generation
+//	r.Serve(WithAddr(":8080"), WithGenerateHelpers(true)) // Production with helper generation
 func (r *Router) Serve(opts ...ServeOption) error {
 	env := os.Getenv("ROUTER_ENV")
 	isProduction := env == "production"
