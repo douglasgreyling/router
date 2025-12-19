@@ -24,17 +24,18 @@ func TestNamedRoutes(t *testing.T) {
 	})
 
 	// Verify routes are registered
-	if r.namedRoutes["user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_show"] == nil {
 		t.Error("user_show route not registered")
 	}
 
-	if r.namedRoutes["post_show"] == nil {
+	if namedRoutes["post_show"] == nil {
 		t.Error("post_show route not registered")
 	}
 
 	// Verify route patterns
-	if r.namedRoutes["user_show"].pattern != "/users/:id" {
-		t.Errorf("expected /users/:id, got %s", r.namedRoutes["user_show"].pattern)
+	if namedRoutes["user_show"].Pattern != "/users/:id" {
+		t.Errorf("expected /users/:id, got %s", namedRoutes["user_show"].Pattern)
 	}
 }
 
@@ -64,7 +65,8 @@ func TestNamedRoutesWithMiddleware(t *testing.T) {
 	}
 
 	// Verify route is registered
-	if r.namedRoutes["user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_show"] == nil {
 		t.Error("user_show route not registered")
 	}
 }
@@ -82,16 +84,17 @@ func TestNamedRoutesInGroups(t *testing.T) {
 	}, WithName("api_post_show"))
 
 	// Verify routes are registered with full path
-	if r.namedRoutes["api_user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["api_user_show"] == nil {
 		t.Error("api_user_show route not registered")
 	}
 
-	if r.namedRoutes["api_user_show"].pattern != "/api/v1/users/:id" {
-		t.Errorf("expected /api/v1/users/:id, got %s", r.namedRoutes["api_user_show"].pattern)
+	if namedRoutes["api_user_show"].Pattern != "/api/v1/users/:id" {
+		t.Errorf("expected /api/v1/users/:id, got %s", namedRoutes["api_user_show"].Pattern)
 	}
 
-	if r.namedRoutes["api_post_show"].pattern != "/api/v1/posts/:id" {
-		t.Errorf("expected /api/v1/posts/:id, got %s", r.namedRoutes["api_post_show"].pattern)
+	if namedRoutes["api_post_show"].Pattern != "/api/v1/posts/:id" {
+		t.Errorf("expected /api/v1/posts/:id, got %s", namedRoutes["api_post_show"].Pattern)
 	}
 }
 
@@ -106,12 +109,13 @@ func TestNamedRoutesMultipleParams(t *testing.T) {
 	}, WithName("user_post"))
 
 	// Verify route is registered
-	if r.namedRoutes["user_post"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_post"] == nil {
 		t.Error("user_post route not registered")
 	}
 
-	if r.namedRoutes["user_post"].pattern != "/users/:user_id/posts/:post_id" {
-		t.Errorf("expected /users/:user_id/posts/:post_id, got %s", r.namedRoutes["user_post"].pattern)
+	if namedRoutes["user_post"].Pattern != "/users/:user_id/posts/:post_id" {
+		t.Errorf("expected /users/:user_id/posts/:post_id, got %s", namedRoutes["user_post"].Pattern)
 	}
 }
 
@@ -142,15 +146,16 @@ func TestNamedRoutesAllMethods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route := r.namedRoutes[tt.name]
+			namedRoutes := r.NamedRoutes()
+			route := namedRoutes[tt.name]
 			if route == nil {
 				t.Fatalf("route %s not registered", tt.name)
 			}
-			if route.pattern != tt.expected {
-				t.Errorf("expected pattern %s, got %s", tt.expected, route.pattern)
+			if route.Pattern != tt.expected {
+				t.Errorf("expected pattern %s, got %s", tt.expected, route.Pattern)
 			}
-			if route.method != tt.method {
-				t.Errorf("expected method %s, got %s", tt.method, route.method)
+			if route.Method != tt.method {
+				t.Errorf("expected method %s, got %s", tt.method, route.Method)
 			}
 		})
 	}
