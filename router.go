@@ -366,7 +366,7 @@ func (r *Router) NamedRoutes() map[string]*naming.Route {
 
 // ServeConfig holds configuration for the Serve method
 type ServeConfig struct {
-	Addr             string
+	Port             string
 	GenerateRoutes   bool
 	RoutesPackage    string
 	RoutesOutputFile string
@@ -375,10 +375,19 @@ type ServeConfig struct {
 // ServeOption is a functional option for configuring Serve
 type ServeOption func(*ServeConfig)
 
-// WithAddr sets the server address
-func WithAddr(addr string) ServeOption {
+// WithPort sets the server port
+func WithPort(port string) ServeOption {
 	return func(c *ServeConfig) {
-		c.Addr = addr
+		c.Port = port
+	}
+}
+
+// WithGenerateHelpers enables route helper code generation on server start.
+// By default, helpers are generated automatically in development mode (when ROUTER_ENV != "production").
+// Use this option to explicitly control route helper generation.
+func WithGenerateHelpers(enabled bool) ServeOption {
+	return func(c *ServeConfig) {
+		c.GenerateRoutes = enabled
 	}
 }
 
@@ -415,7 +424,7 @@ func (r *Router) listenAndServe(addr string) error {
 // By default, route helpers are generated in development mode (ROUTER_ENV != "production").
 //
 // Defaults:
-//   - addr: ":3000"
+//   - port: ":3000"
 //   - generateRoutes: true in development, false in production
 //   - routesPackage: "routes"
 //   - routesOutputFile: "routes/generated.go"
@@ -423,16 +432,16 @@ func (r *Router) listenAndServe(addr string) error {
 // Usage:
 //
 //	r.Serve()                                          // Use all defaults
-//	r.Serve(WithAddr(":8080"))                         // Custom port
+//	r.Serve(WithPort(":8080"))                         // Custom port
 //	r.Serve(WithGenerateHelpers(false))                // Disable helper generation
-//	r.Serve(WithAddr(":8080"), WithGenerateHelpers(true)) // Production with helper generation
+//	r.Serve(WithPort(":8080"), WithGenerateHelpers(true)) // Production with helper generation
 func (r *Router) Serve(opts ...ServeOption) error {
 	env := os.Getenv("ROUTER_ENV")
 	isProduction := env == "production"
 
 	// Apply defaults
 	config := &ServeConfig{
-		Addr:             ":3000",
+		Port:             ":3000",
 		GenerateRoutes:   !isProduction, // Auto-generate in development
 		RoutesPackage:    "routes",
 		RoutesOutputFile: "routes/generated.go",
@@ -452,6 +461,6 @@ func (r *Router) Serve(opts ...ServeOption) error {
 		fmt.Println("Route generation complete!")
 	}
 
-	fmt.Printf("Starting server on http://localhost%s\n", config.Addr)
-	return r.listenAndServe(config.Addr)
+	fmt.Printf("Starting server on http://localhost%s\n", config.Port)
+	return r.listenAndServe(config.Port)
 }

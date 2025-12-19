@@ -1,0 +1,10 @@
+title: Router
+description: A fast, flexible HTTP router for Go with automatic route helper generation
+baseurl: "/router"
+url: "https://douglasgreyling.github.io"
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
