@@ -7,9 +7,38 @@ import (
 	"net/http"
 )
 
+// responseWriter wraps http.ResponseWriter to track response state
+type responseWriter struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+// WriteHeader captures the status code and tracks that headers were written
+func (w *responseWriter) WriteHeader(code int) {
+	if !w.wroteHeader {
+		w.status = code
+		w.wroteHeader = true
+		w.ResponseWriter.WriteHeader(code)
+	}
+}
+
+// Write ensures WriteHeader is called and tracks that response started
+func (w *responseWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// Status returns the HTTP status code that was written
+func (w *responseWriter) Status() int {
+	return w.status
+}
+
 // Context provides a convenient interface for handling HTTP requests and responses
 type Context struct {
-	Writer  http.ResponseWriter
+	Writer  *responseWriter
 	Request *http.Request
 	Params  Params
 	store   map[string]interface{}
@@ -19,12 +48,24 @@ type Context struct {
 // newContext creates a new Context instance
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
-		Writer:  w,
+		Writer:  &responseWriter{ResponseWriter: w, status: http.StatusOK},
 		Request: r,
 		Params:  make(Params),
 		store:   make(map[string]interface{}),
 		index:   -1,
 	}
+}
+
+// IsHeaderWritten returns true if response headers have been sent to the client.
+// Once headers are written, the status code and headers cannot be changed.
+func (c *Context) IsHeaderWritten() bool {
+	return c.Writer.wroteHeader
+}
+
+// ResponseStatus returns the HTTP status code that was written (or will be written).
+// Returns 200 (StatusOK) if no status has been explicitly set.
+func (c *Context) ResponseStatus() int {
+	return c.Writer.Status()
 }
 
 // Param returns a route parameter by name
@@ -173,6 +214,12 @@ func (c *Context) SetCookie(cookie *http.Cookie) {
 // Status sets the response status code
 func (c *Context) Status(code int) {
 	c.Writer.WriteHeader(code)
+}
+
+// GetStatus returns the HTTP status code that was written (or will be written).
+// Returns 200 if no status has been explicitly set.
+func (c *Context) GetStatus() int {
+	return c.Writer.Status()
 }
 
 // ClientIP returns the client's IP address

@@ -93,6 +93,12 @@ func New() *Router {
 			})
 		},
 		ErrorHandler: func(c *Context, err error) {
+			// Can't modify response if headers already sent
+			if c.IsHeaderWritten() {
+				// Log error since we can't send proper error response
+				fmt.Fprintf(os.Stderr, "Error after headers sent: %v\n", err)
+				return
+			}
 			c.JSON(http.StatusInternalServerError, map[string]string{
 				"error": err.Error(),
 			})

@@ -394,3 +394,112 @@ func TestUniqueParameterNames(t *testing.T) {
 		t.Errorf("Expected '123:456', got '%s'", w.Body.String())
 	}
 }
+
+func TestErrorHandlerAfterHeadersWritten(t *testing.T) {
+	r := New()
+
+	// Suppress stderr for this test since we expect the error log
+	r.ErrorHandler = func(c *Context, err error) {
+		if !c.IsHeaderWritten() {
+			c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": err.Error(),
+			})
+		}
+		// Silently ignore - we're testing this behavior
+	}
+
+	r.Get("/test", func(c *Context) error {
+		// Write headers and part of response
+		c.Writer.WriteHeader(http.StatusOK)
+		c.Writer.Write([]byte("Success"))
+
+		// Now return an error
+		return fmt.Errorf("error after headers sent")
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should have the original response, not error JSON
+	if w.Body.String() != "Success" {
+		t.Errorf("Expected 'Success', got '%s'", w.Body.String())
+	}
+
+	// Status should be OK, not 500
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", w.Code)
+	}
+}
+
+func TestErrorHandlerBeforeHeadersWritten(t *testing.T) {
+	r := New()
+
+	r.Get("/test", func(c *Context) error {
+		// Return error before writing anything
+		return fmt.Errorf("early error")
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	// Should have error JSON response
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("Expected status 500, got %d", w.Code)
+	}
+
+	if !strings.Contains(w.Body.String(), "early error") {
+		t.Errorf("Expected error message in body, got '%s'", w.Body.String())
+	}
+}
+
+func TestIsHeaderWritten(t *testing.T) {
+	r := New()
+
+	var headerWrittenBefore, headerWrittenAfter bool
+
+	r.Get("/test", func(c *Context) error {
+		headerWrittenBefore = c.IsHeaderWritten()
+		c.JSON(http.StatusOK, map[string]string{"message": "hello"})
+		headerWrittenAfter = c.IsHeaderWritten()
+		return nil
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if headerWrittenBefore {
+		t.Error("Headers should not be written before calling JSON")
+	}
+
+	if !headerWrittenAfter {
+		t.Error("Headers should be written after calling JSON")
+	}
+}
+
+func TestResponseStatus(t *testing.T) {
+	r := New()
+
+	var statusBefore, statusAfter int
+
+	r.Get("/test", func(c *Context) error {
+		statusBefore = c.ResponseStatus()
+		c.Writer.WriteHeader(http.StatusCreated)
+		statusAfter = c.ResponseStatus()
+		return nil
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if statusBefore != http.StatusOK {
+		t.Errorf("Expected default status 200, got %d", statusBefore)
+	}
+
+	if statusAfter != http.StatusCreated {
+		t.Errorf("Expected status 201, got %d", statusAfter)
+	}
+}
