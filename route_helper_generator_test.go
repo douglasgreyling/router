@@ -142,8 +142,8 @@ func TestMakeParamNames(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorAddRoute(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestRouteHelperGeneratorAddRoute(t *testing.T) {
+	cg := NewRouteHelperGenerator()
 
 	cg.AddRoute("home", "/", "GET")
 	cg.AddRoute("user_show", "/users/:id", "GET")
@@ -178,8 +178,8 @@ func TestPathHelperGeneratorAddRoute(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorGenerate(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestRouteHelperGeneratorGenerate(t *testing.T) {
+	cg := NewRouteHelperGenerator()
 	cg.AddRoute("home", "/", "GET")
 	cg.AddRoute("user_show", "/users/:id", "GET")
 	cg.AddRoute("user_post", "/users/:user_id/posts/:post_id", "GET")
@@ -229,8 +229,8 @@ func TestPathHelperGeneratorGenerate(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorGenerateWithEmptyRoutes(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestRouteHelperGeneratorGenerateWithEmptyRoutes(t *testing.T) {
+	cg := NewRouteHelperGenerator()
 
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "routes.go")
@@ -246,8 +246,8 @@ func TestPathHelperGeneratorGenerateWithEmptyRoutes(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorGenerateComplexRoutes(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestRouteHelperGeneratorGenerateComplexRoutes(t *testing.T) {
+	cg := NewRouteHelperGenerator()
 	cg.AddRoute("multi_param", "/foo/:a/bar/:b/baz/:c", "GET")
 	cg.AddRoute("api_product", "/api/v1/products/:id", "GET")
 	cg.AddRoute("nested_resource", "/orgs/:org_id/teams/:team_id/members/:id", "GET")

@@ -1,3 +1,69 @@
+// Package router provides a fast, flexible HTTP router with automatic
+// route helper generation, RESTful resource scaffolding, and type-safe
+// middleware composition.
+//
+// Basic Usage:
+//
+//	r := router.New()
+//
+//	r.Get("/users/:id", func(c *router.Context) error {
+//	    id := c.Param("id")
+//	    return c.JSON(200, map[string]string{"id": id})
+//	})
+//
+//	r.Serve() // Starts server on :3000 with route helper generation
+//
+// Features:
+//
+//   - Fast radix tree routing with parameter and wildcard support
+//   - Automatic code generation of type-safe route helpers
+//   - RESTful resource scaffolding (Rails-inspired)
+//   - Flexible middleware with group and route-level composition
+//   - Rich Context API for request/response handling
+//
+// Route Parameters:
+//
+// The router supports two types of dynamic segments:
+//
+//   - Named parameters (:param) match a single path segment
+//   - Wildcards (*wildcard) match everything after the prefix
+//
+// Example:
+//
+//	r.Get("/users/:id", handler)           // Matches: /users/123
+//	r.Get("/files/*filepath", handler)     // Matches: /files/docs/readme.txt
+//
+// Middleware:
+//
+// Middleware can be applied at the router, group, or route level:
+//
+//	r.Use(loggingMiddleware)  // Applied to all routes
+//
+//	api := r.Group("/api", authMiddleware)  // Applied to group
+//	api.Get("/users", handler)
+//
+//	r.Get("/public", handler, cacheMiddleware)  // Applied to single route
+//
+// RESTful Resources:
+//
+// The router provides Rails-inspired resource scaffolding:
+//
+//	type PostController struct{}
+//
+//	func (pc *PostController) Index(c *router.Context) error {
+//	    return c.JSON(200, posts)
+//	}
+//
+//	func (pc *PostController) Show(c *router.Context) error {
+//	    id := c.Param("id")
+//	    return c.JSON(200, findPost(id))
+//	}
+//
+//	r.Resources("/posts", &PostController{},
+//	    Only(IndexAction, ShowAction),
+//	)
+//
+// For more examples and documentation, see: https://github.com/douglasgreyling/router
 package router
 
 import (
@@ -111,20 +177,16 @@ func (r *Router) Use(middleware ...MiddlewareFunc) {
 	r.middleware = append(r.middleware, middleware...)
 }
 
-// Handle registers a new route with the given method and path.
-// A route name is automatically generated for path helper generation.
-// Use the HTTP method helpers (Get, Post, etc.) with WithName() for custom names.
+// handle registers a new route with the given method and path.
+// This is an internal method called by HTTP method helpers (Get, Post, etc.).
+// A route name is automatically generated if not provided.
 //
 // Panics if:
 //   - path does not begin with '/'
 //   - path contains duplicate parameter names (e.g., /users/:id/posts/:id)
-//
-// This method is intended for use during application startup. Panics are
-// deliberate to catch configuration errors early, preventing the application
-// from starting with invalid routes.
-func (r *Router) Handle(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
+func (r *Router) handle(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
 	if path[0] != '/' {
-		panic("path must begin with '/'")
+		panic(fmt.Sprintf("invalid route path %q for %s: path must begin with '/'", path, method))
 	}
 
 	if r.trees[method] == nil {
@@ -149,52 +211,52 @@ func (r *Router) Handle(method, path string, handler HandlerFunc, name string, m
 }
 
 // Get registers a GET route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("GET", path, handler, name, middleware...)
+	r.handle("GET", path, handler, name, middleware...)
 }
 
 // Post registers a POST route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("POST", path, handler, name, middleware...)
+	r.handle("POST", path, handler, name, middleware...)
 }
 
 // Put registers a PUT route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("PUT", path, handler, name, middleware...)
+	r.handle("PUT", path, handler, name, middleware...)
 }
 
 // Patch registers a PATCH route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("PATCH", path, handler, name, middleware...)
+	r.handle("PATCH", path, handler, name, middleware...)
 }
 
 // Delete registers a DELETE route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("DELETE", path, handler, name, middleware...)
+	r.handle("DELETE", path, handler, name, middleware...)
 }
 
 // Head registers a HEAD route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("HEAD", path, handler, name, middleware...)
+	r.handle("HEAD", path, handler, name, middleware...)
 }
 
 // Options registers an OPTIONS route with optional name and middleware.
-// Panics on invalid paths (see Handle for details).
+// Panics on invalid paths (see handle for details).
 func (r *Router) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.Handle("OPTIONS", path, handler, name, middleware...)
+	r.handle("OPTIONS", path, handler, name, middleware...)
 }
 
 // addNamedRoute registers a named route for code generation
@@ -293,14 +355,14 @@ func (r *Router) addRoute(method, path string, handler HandlerFunc, middleware [
 	segments := strings.Split(path, "/")
 
 	// Validate no duplicate parameter names
-	paramNames := make(map[string]bool)
-	for _, segment := range segments {
+	paramNames := make(map[string]int)
+	for i, segment := range segments {
 		if len(segment) > 0 && (segment[0] == ':' || segment[0] == '*') {
 			paramName := segment[1:]
-			if paramNames[paramName] {
-				panic(fmt.Sprintf("duplicate parameter name '%s' in route '%s %s'", paramName, method, path))
+			if firstIndex, exists := paramNames[paramName]; exists {
+				panic(fmt.Sprintf("duplicate parameter %q in route %s /%s: first occurrence at segment %d, duplicate at segment %d", paramName, method, path, firstIndex, i))
 			}
-			paramNames[paramName] = true
+			paramNames[paramName] = i
 		}
 	}
 
@@ -467,7 +529,7 @@ func (r *Router) search(n *node, segments []string, index int, params Params, me
 
 // GenerateRoutes generates type-safe route helpers
 func (r *Router) GenerateRoutes(packageName, outputFile string) error {
-	cg := NewPathHelperGenerator()
+	cg := NewRouteHelperGenerator()
 
 	// print out all named routes
 	fmt.Printf("Generating route helpers for %d named routes...\n", len(r.namedRoutes))

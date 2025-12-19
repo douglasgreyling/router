@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -347,8 +348,8 @@ func TestDuplicateParameterNames(t *testing.T) {
 			t.Error("Expected panic for duplicate parameter names")
 		} else {
 			msg := fmt.Sprint(rec)
-			if !strings.Contains(msg, "duplicate parameter name 'id'") {
-				t.Errorf("Expected panic message about 'id', got: %s", msg)
+			if !strings.Contains(msg, "duplicate parameter") || !strings.Contains(msg, "id") {
+				t.Errorf("Expected panic message about duplicate parameter 'id', got: %s", msg)
 			}
 		}
 	}()
@@ -367,8 +368,8 @@ func TestDuplicateParameterNamesWithWildcard(t *testing.T) {
 			t.Error("Expected panic for duplicate parameter names")
 		} else {
 			msg := fmt.Sprint(rec)
-			if !strings.Contains(msg, "duplicate parameter name 'path'") {
-				t.Errorf("Expected panic message about 'path', got: %s", msg)
+			if !strings.Contains(msg, "duplicate parameter") || !strings.Contains(msg, "path") {
+				t.Errorf("Expected panic message about duplicate parameter 'path', got: %s", msg)
 			}
 		}
 	}()
@@ -503,3 +504,181 @@ func TestResponseStatus(t *testing.T) {
 		t.Errorf("Expected status 201, got %d", statusAfter)
 	}
 }
+
+func TestConcurrentRequests(t *testing.T) {
+	r := New()
+
+	callCount := 0
+	var mu sync.Mutex
+
+	r.Get("/test", func(c *Context) error {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		return c.String(http.StatusOK, "OK")
+	})
+
+	r.Get("/params/:id", func(c *Context) error {
+		id := c.Param("id")
+		return c.String(http.StatusOK, id)
+	})
+
+	const numGoroutines = 100
+	var wg sync.WaitGroup
+
+	// Test static routes
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest("GET", "/test", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", w.Code)
+			}
+		}()
+	}
+
+	// Test parameterized routes
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			path := fmt.Sprintf("/params/%d", id)
+			req := httptest.NewRequest("GET", path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("Expected status 200, got %d", w.Code)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if callCount != numGoroutines {
+		t.Errorf("Expected %d calls, got %d", numGoroutines, callCount)
+	}
+}
+
+// Benchmarks
+
+func BenchmarkStaticRoutes(b *testing.B) {
+	r := New()
+	r.Get("/users", func(c *Context) error {
+		return c.String(http.StatusOK, "users")
+	})
+
+	req := httptest.NewRequest("GET", "/users", nil)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkParameterRoutes(b *testing.B) {
+	r := New()
+	r.Get("/users/:id", func(c *Context) error {
+		id := c.Param("id")
+		return c.String(http.StatusOK, id)
+	})
+
+	req := httptest.NewRequest("GET", "/users/123", nil)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkWildcardRoutes(b *testing.B) {
+	r := New()
+	r.Get("/files/*filepath", func(c *Context) error {
+		path := c.Param("filepath")
+		return c.String(http.StatusOK, path)
+	})
+
+	req := httptest.NewRequest("GET", "/files/some/deep/path/file.txt", nil)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkComplexRouting(b *testing.B) {
+	r := New()
+
+	// Multiple routes to simulate realistic routing
+	r.Get("/", func(c *Context) error { return c.String(http.StatusOK, "home") })
+	r.Get("/about", func(c *Context) error { return c.String(http.StatusOK, "about") })
+	r.Get("/contact", func(c *Context) error { return c.String(http.StatusOK, "contact") })
+	r.Get("/users", func(c *Context) error { return c.String(http.StatusOK, "users") })
+	r.Get("/users/:id", func(c *Context) error { return c.String(http.StatusOK, "user") })
+	r.Get("/users/:id/posts", func(c *Context) error { return c.String(http.StatusOK, "posts") })
+	r.Get("/users/:id/posts/:post_id", func(c *Context) error { return c.String(http.StatusOK, "post") })
+	r.Get("/files/*filepath", func(c *Context) error { return c.String(http.StatusOK, "file") })
+
+	req := httptest.NewRequest("GET", "/users/42/posts/123", nil)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+}
+
+func BenchmarkMiddlewareChain(b *testing.B) {
+	r := New()
+
+	// Add multiple middleware
+	middleware1 := func(next HandlerFunc) HandlerFunc {
+		return func(c *Context) error {
+			return next(c)
+		}
+	}
+	middleware2 := func(next HandlerFunc) HandlerFunc {
+		return func(c *Context) error {
+			return next(c)
+		}
+	}
+	middleware3 := func(next HandlerFunc) HandlerFunc {
+		return func(c *Context) error {
+			return next(c)
+		}
+	}
+
+	r.Use(middleware1, middleware2, middleware3)
+
+	r.Get("/test", func(c *Context) error {
+		return c.String(http.StatusOK, "test")
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+	}
+}
+

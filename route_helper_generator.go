@@ -22,20 +22,20 @@ type RouteParam struct {
 	Type string // "string", "int", etc.
 }
 
-// PathHelperGenerator generates type-safe route helper functions
-type PathHelperGenerator struct {
+// RouteHelperGenerator generates type-safe route helper functions
+type RouteHelperGenerator struct {
 	routes []RouteInfo
 }
 
-// NewPathHelperGenerator creates a new path helper generator instance
-func NewPathHelperGenerator() *PathHelperGenerator {
-	return &PathHelperGenerator{
+// NewRouteHelperGenerator creates a new route helper generator instance
+func NewRouteHelperGenerator() *RouteHelperGenerator {
+	return &RouteHelperGenerator{
 		routes: make([]RouteInfo, 0),
 	}
 }
 
 // AddRoute registers a route for code generation
-func (cg *PathHelperGenerator) AddRoute(name, pattern, method string) {
+func (cg *RouteHelperGenerator) AddRoute(name, pattern, method string) {
 	params := extractParameters(pattern)
 	cg.routes = append(cg.routes, RouteInfo{
 		Name:       name,
@@ -65,7 +65,7 @@ func extractParameters(pattern string) []RouteParam {
 }
 
 // Generate creates the Go source file with route helpers
-func (cg *PathHelperGenerator) Generate(packageName, outputFile string) error {
+func (cg *RouteHelperGenerator) Generate(packageName, outputFile string) error {
 	// If no routes exist, remove the generated file if it exists
 	if len(cg.routes) == 0 {
 		if _, err := os.Stat(outputFile); err == nil {
