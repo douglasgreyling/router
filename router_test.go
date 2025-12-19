@@ -480,15 +480,15 @@ func TestIsHeaderWritten(t *testing.T) {
 	}
 }
 
-func TestResponseStatus(t *testing.T) {
+func TestGetStatus(t *testing.T) {
 	r := New()
 
 	var statusBefore, statusAfter int
 
 	r.Get("/test", func(c *Context) error {
-		statusBefore = c.ResponseStatus()
+		statusBefore = c.GetStatus()
 		c.Writer.WriteHeader(http.StatusCreated)
-		statusAfter = c.ResponseStatus()
+		statusAfter = c.GetStatus()
 		return nil
 	})
 

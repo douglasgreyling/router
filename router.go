@@ -35,14 +35,52 @@
 //
 // Middleware:
 //
-// Middleware can be applied at the router, group, or route level:
+// Middleware can be applied at the router, group, or route level.
+// Middleware is executed in order: global → group → route-specific.
 //
-//	r.Use(loggingMiddleware)  // Applied to all routes
+//	r.Use(loggingMiddleware)  // Applied to all routes (executes first)
 //
-//	api := r.Group("/api", authMiddleware)  // Applied to group
+//	api := r.Group("/api", authMiddleware)  // Applied to group (executes second)
 //	api.Get("/users", handler)
 //
-//	r.Get("/public", handler, cacheMiddleware)  // Applied to single route
+//	r.Get("/public", handler, WithMiddleware(cacheMiddleware))  // Route-specific (executes last)
+//
+// Error Handling:
+//
+// Handlers return errors, which are processed by the ErrorHandler.
+// The default ErrorHandler sends a JSON error response:
+//
+//	r.Get("/users/:id", func(c *Context) error {
+//	    user, err := findUser(c.Param("id"))
+//	    if err != nil {
+//	        return err  // ErrorHandler will process this
+//	    }
+//	    return c.JSON(200, user)
+//	})
+//
+// Customize error handling:
+//
+//	r.ErrorHandler = func(c *Context, err error) {
+//	    if c.IsHeaderWritten() {
+//	        log.Printf("Error after headers sent: %v", err)
+//	        return
+//	    }
+//	    c.JSON(500, map[string]string{"error": err.Error()})
+//	}
+//
+// Generated Route Helpers:
+//
+// The router automatically generates type-safe route helpers in development mode.
+// For a route named "users_show", you can generate URLs like:
+//
+//	import "yourapp/routes"
+//	url := routes.UsersShowPath(id)  // Generates: /users/:id
+//
+// Control generation:
+//
+//	r.Serve()                           // Auto-generate in development
+//	r.Serve(WithGenerateHelpers(false)) // Disable generation
+//	r.Serve(WithRoutesPackage("api"), WithRoutesOutputFile("api/routes.go"))
 //
 // RESTful Resources:
 //
@@ -76,10 +114,28 @@ import (
 	"router/routehelper"
 )
 
-// HandlerFunc is the function signature for route handlers
+// HandlerFunc is the function signature for route handlers.
+// Handlers receive a Context and return an error. If an error is returned,
+// it will be processed by the router's ErrorHandler.
+//
+// Example:
+//
+//	func myHandler(c *router.Context) error {
+//	    data := map[string]string{"message": "hello"}
+//	    return c.JSON(200, data)
+//	}
 type HandlerFunc func(*Context) error
 
-// Params holds route parameters extracted from the URL
+// Params holds route parameters extracted from the URL.
+// Parameters are defined in routes using :name syntax.
+//
+// Example:
+//
+//	r.Get("/users/:id/posts/:post_id", func(c *Context) error {
+//	    userID := c.Param("id")        // Access via Context.Param()
+//	    postID := c.Param("post_id")
+//	    return c.String(200, "User: %s, Post: %s", userID, postID)
+//	})
 type Params map[string]string
 
 // Router is the main router structure
@@ -167,49 +223,63 @@ func (r *Router) handle(method, path string, handler HandlerFunc, name string, m
 	}
 }
 
-// Get registers a GET route with optional name and middleware.
+// Get registers a GET route with optional configuration.
+//
+// Options can be provided using WithName() and WithMiddleware():
+//
+//	r.Get("/users/:id", handler)
+//	r.Get("/users/:id", handler, WithName("user_show"))
+//	r.Get("/users/:id", handler, WithMiddleware(auth, logging))
+//	r.Get("/users/:id", handler, WithName("user_show"), WithMiddleware(auth))
+//
 // Panics on invalid paths (see handle for details).
 func (r *Router) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("GET", path, handler, name, middleware...)
 }
 
-// Post registers a POST route with optional name and middleware.
+// Post registers a POST route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("POST", path, handler, name, middleware...)
 }
 
-// Put registers a PUT route with optional name and middleware.
+// Put registers a PUT route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("PUT", path, handler, name, middleware...)
 }
 
-// Patch registers a PATCH route with optional name and middleware.
+// Patch registers a PATCH route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("PATCH", path, handler, name, middleware...)
 }
 
-// Delete registers a DELETE route with optional name and middleware.
+// Delete registers a DELETE route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("DELETE", path, handler, name, middleware...)
 }
 
-// Head registers a HEAD route with optional name and middleware.
+// Head registers a HEAD route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.handle("HEAD", path, handler, name, middleware...)
 }
 
-// Options registers an OPTIONS route with optional name and middleware.
+// Options registers an OPTIONS route with optional configuration.
+// See Get() for usage examples.
 // Panics on invalid paths (see handle for details).
 func (r *Router) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
@@ -335,9 +405,9 @@ func WithRoutesOutputFile(file string) ServeOption {
 	}
 }
 
-// ListenAndServe starts the HTTP server on the specified address.
-// This is a thin wrapper around http.ListenAndServe for convenience.
-func (r *Router) ListenAndServe(addr string) error {
+// listenAndServe is an internal helper that starts the HTTP server.
+// Users should use Serve() instead, or http.ListenAndServe(addr, router) for direct control.
+func (r *Router) listenAndServe(addr string) error {
 	return http.ListenAndServe(addr, r)
 }
 
@@ -383,5 +453,5 @@ func (r *Router) Serve(opts ...ServeOption) error {
 	}
 
 	fmt.Printf("Starting server on http://localhost%s\n", config.Addr)
-	return r.ListenAndServe(config.Addr)
+	return r.listenAndServe(config.Addr)
 }
