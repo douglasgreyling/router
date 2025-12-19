@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started | Router</title>
+  <meta name="description" content="A fast, flexible HTTP router for Go with automatic route helper generation">
+  <link rel="stylesheet" href="/router/assets/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1 class="site-title"><a href="/router/">Router</a></h1>
+      <p class="site-description">A fast, flexible HTTP router for Go with automatic route helper generation</p>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <a href="/router/" >Home</a>
+    <a href="/router/getting-started" class="active">Getting Started</a>
+    <a href="/router/guide" >Guide</a>
+    <a href="/router/api-reference" >API Reference</a>
+    <a href="/router/examples" >Examples</a>
+    <a href="https://github.com/douglasgreyling/router" target="_blank">GitHub</a>
+  </nav>
+
+  <div class="container">
+    
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <h4>On This Page</h4>
+        <ul id="toc"></ul>
+      </nav>
+    </aside>
+    
+
+    <main class="content">
+      <article>
+        <h1 id="getting-started">Getting Started</h1>
+
+<h2 id="installation">Installation</h2>
+
+<p>Install the router package using Go modules:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>go get github.com/douglasgreyling/router
+</code></pre></div></div>
+
+<h2 id="basic-usage">Basic Usage</h2>
+
+<p>Create a simple HTTP server with routing:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">package</span> <span class="n">main</span>
+
+<span class="k">import</span> <span class="p">(</span>
+    <span class="s">"github.com/douglasgreyling/router"</span>
+<span class="p">)</span>
+
+<span class="k">func</span> <span class="n">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">r</span> <span class="o">:=</span> <span class="n">router</span><span class="o">.</span><span class="n">New</span><span class="p">()</span>
+
+    <span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">String</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="s">"Hello, World!"</span><span class="p">)</span>
+    <span class="p">})</span>
+
+    <span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/users/:id"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+        <span class="n">id</span> <span class="o">:=</span> <span class="n">c</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">"id"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">JSON</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="k">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span>
+            <span class="s">"id"</span><span class="o">:</span> <span class="n">id</span><span class="p">,</span>
+            <span class="s">"message"</span><span class="o">:</span> <span class="s">"User found"</span><span class="p">,</span>
+        <span class="p">})</span>
+    <span class="p">})</span>
+
+    <span class="n">r</span><span class="o">.</span><span class="n">Serve</span><span class="p">()</span> <span class="c">// Starts server on :3000</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="route-parameters">Route Parameters</h2>
+
+<p>The router supports two types of dynamic segments:</p>
+
+<h3 id="named-parameters">Named Parameters</h3>
+
+<p>Named parameters match a single path segment:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/users/:id"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="n">id</span> <span class="o">:=</span> <span class="n">c</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">"id"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">String</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="s">"User ID: "</span> <span class="o">+</span> <span class="n">id</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="c">// Matches: /users/123</span>
+<span class="c">// Does NOT match: /users/123/posts</span>
+</code></pre></div></div>
+
+<h3 id="wildcards">Wildcards</h3>
+
+<p>Wildcards match everything after the prefix:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/files/*filepath"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="n">filepath</span> <span class="o">:=</span> <span class="n">c</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">"filepath"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">String</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="s">"File: "</span> <span class="o">+</span> <span class="n">filepath</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="c">// Matches: /files/docs/readme.txt</span>
+<span class="c">// Matches: /files/images/photo.jpg</span>
+</code></pre></div></div>
+
+<h2 id="http-methods">HTTP Methods</h2>
+
+<p>All standard HTTP methods are supported:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/posts"</span><span class="p">,</span> <span class="n">listPosts</span><span class="p">)</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Post</span><span class="p">(</span><span class="s">"/posts"</span><span class="p">,</span> <span class="n">createPost</span><span class="p">)</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Put</span><span class="p">(</span><span class="s">"/posts/:id"</span><span class="p">,</span> <span class="n">updatePost</span><span class="p">)</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Patch</span><span class="p">(</span><span class="s">"/posts/:id"</span><span class="p">,</span> <span class="n">patchPost</span><span class="p">)</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Delete</span><span class="p">(</span><span class="s">"/posts/:id"</span><span class="p">,</span> <span class="n">deletePost</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="response-helpers">Response Helpers</h2>
+
+<p>The Context provides convenient methods for sending responses:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">// JSON response</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/json"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">JSON</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="k">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">"status"</span><span class="o">:</span> <span class="s">"ok"</span><span class="p">})</span>
+<span class="p">})</span>
+
+<span class="c">// String response</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/text"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">String</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="s">"Plain text response"</span><span class="p">)</span>
+<span class="p">})</span>
+
+<span class="c">// HTML response</span>
+<span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/html"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">HTML</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="s">"&lt;h1&gt;Hello&lt;/h1&gt;"</span><span class="p">)</span>
+<span class="p">})</span>
+</code></pre></div></div>
+
+<h2 id="error-handling">Error Handling</h2>
+
+<p>Handlers return errors, which are processed by the ErrorHandler:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/users/:id"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+    <span class="n">user</span><span class="p">,</span> <span class="n">err</span> <span class="o">:=</span> <span class="n">findUser</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">"id"</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">err</span> <span class="o">!=</span> <span class="no">nil</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">err</span>  <span class="c">// ErrorHandler will process this</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">JSON</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="n">user</span><span class="p">)</span>
+<span class="p">})</span>
+</code></pre></div></div>
+
+<p>Customize error handling:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">ErrorHandler</span> <span class="o">=</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">,</span> <span class="n">err</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">IsHeaderWritten</span><span class="p">()</span> <span class="p">{</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">Printf</span><span class="p">(</span><span class="s">"Error after headers sent: %v"</span><span class="p">,</span> <span class="n">err</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="p">}</span>
+    <span class="n">c</span><span class="o">.</span><span class="n">JSON</span><span class="p">(</span><span class="m">500</span><span class="p">,</span> <span class="k">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">"error"</span><span class="o">:</span> <span class="n">err</span><span class="o">.</span><span class="n">Error</span><span class="p">()})</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="server-configuration">Server Configuration</h2>
+
+<p>Customize server options:</p>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">r</span><span class="o">.</span><span class="n">Serve</span><span class="p">(</span>
+    <span class="n">router</span><span class="o">.</span><span class="n">WithPort</span><span class="p">(</span><span class="m">8080</span><span class="p">),</span>
+    <span class="n">router</span><span class="o">.</span><span class="n">WithGenerateHelpers</span><span class="p">(</span><span class="no">false</span><span class="p">),</span>
+<span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="next-steps">Next Steps</h2>
+
+<ul>
+  <li>Learn about <a href="guide#middleware">Middleware</a></li>
+  <li>Explore <a href="guide#restful-resources">RESTful Resources</a></li>
+  <li>Understand <a href="guide#route-helpers">Route Helpers</a></li>
+  <li>See <a href="examples">Real-world Examples</a></li>
+</ul>
+
+      </article>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2025 Router. Licensed under MIT License.</p>
+    <p>
+      <a href="https://github.com/douglasgreyling/router">GitHub</a> |
+      <a href="https://pkg.go.dev/github.com/douglasgreyling/router">pkg.go.dev</a>
+    </p>
+  </footer>
+
+  <script src="/router/assets/js/toc.js"></script>
+</body>
+</html>

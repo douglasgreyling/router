@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home | Router</title>
+  <meta name="description" content="A fast, flexible HTTP router for Go with automatic route helper generation">
+  <link rel="stylesheet" href="/router/assets/css/style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1 class="site-title"><a href="/router/">Router</a></h1>
+      <p class="site-description">A fast, flexible HTTP router for Go with automatic route helper generation</p>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <a href="/router/" class="active">Home</a>
+    <a href="/router/getting-started" >Getting Started</a>
+    <a href="/router/guide" >Guide</a>
+    <a href="/router/api-reference" >API Reference</a>
+    <a href="/router/examples" >Examples</a>
+    <a href="https://github.com/douglasgreyling/router" target="_blank">GitHub</a>
+  </nav>
+
+  <div class="container">
+    
+
+    <main class="content">
+      <article>
+        <div class="home-content">
+  <h1 id="router">Router</h1>
+
+<p>A fast, flexible HTTP router for Go with automatic route helper generation, RESTful resource scaffolding, and type-safe middleware composition.</p>
+
+<h2 id="features">Features</h2>
+
+<ul>
+  <li>🚀 <strong>Fast radix tree routing</strong> with parameter and wildcard support</li>
+  <li>🔧 <strong>Automatic code generation</strong> of type-safe route helpers</li>
+  <li>📦 <strong>RESTful resource scaffolding</strong> (Rails-inspired)</li>
+  <li>🎯 <strong>Flexible middleware</strong> with group and route-level composition</li>
+  <li>💎 <strong>Rich Context API</strong> for request/response handling</li>
+</ul>
+
+<h2 id="quick-start">Quick Start</h2>
+
+<div class="language-go highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">package</span> <span class="n">main</span>
+
+<span class="k">import</span> <span class="s">"github.com/douglasgreyling/router"</span>
+
+<span class="k">func</span> <span class="n">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">r</span> <span class="o">:=</span> <span class="n">router</span><span class="o">.</span><span class="n">New</span><span class="p">()</span>
+
+    <span class="n">r</span><span class="o">.</span><span class="n">Get</span><span class="p">(</span><span class="s">"/users/:id"</span><span class="p">,</span> <span class="k">func</span><span class="p">(</span><span class="n">c</span> <span class="o">*</span><span class="n">router</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+        <span class="n">id</span> <span class="o">:=</span> <span class="n">c</span><span class="o">.</span><span class="n">Param</span><span class="p">(</span><span class="s">"id"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">c</span><span class="o">.</span><span class="n">JSON</span><span class="p">(</span><span class="m">200</span><span class="p">,</span> <span class="k">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kt">string</span><span class="p">{</span><span class="s">"id"</span><span class="o">:</span> <span class="n">id</span><span class="p">})</span>
+    <span class="p">})</span>
+
+    <span class="n">r</span><span class="o">.</span><span class="n">Serve</span><span class="p">()</span> <span class="c">// Starts server on :3000</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="installation">Installation</h2>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>go get github.com/douglasgreyling/router
+</code></pre></div></div>
+
+<h2 id="documentation">Documentation</h2>
+
+<ul>
+  <li><a href="getting-started">Getting Started</a> - Installation and basic usage</li>
+  <li><a href="guide">User Guide</a> - Comprehensive feature guide</li>
+  <li><a href="api-reference">API Reference</a> - Detailed API documentation</li>
+  <li><a href="examples">Examples</a> - Real-world examples</li>
+</ul>
+
+<h2 id="community">Community</h2>
+
+<ul>
+  <li><a href="https://github.com/douglasgreyling/router">GitHub Repository</a></li>
+  <li><a href="https://github.com/douglasgreyling/router/issues">Issue Tracker</a></li>
+  <li><a href="https://pkg.go.dev/github.com/douglasgreyling/router">pkg.go.dev Documentation</a></li>
+</ul>
+
+<h2 id="license">License</h2>
+
+<p>This project is licensed under the MIT License.</p>
+
+</div>
+
+      </article>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2025 Router. Licensed under MIT License.</p>
+    <p>
+      <a href="https://github.com/douglasgreyling/router">GitHub</a> |
+      <a href="https://pkg.go.dev/github.com/douglasgreyling/router">pkg.go.dev</a>
+    </p>
+  </footer>
+
+  <script src="/router/assets/js/toc.js"></script>
+</body>
+</html>
