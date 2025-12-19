@@ -7,9 +7,68 @@ import (
 	"net/http"
 )
 
-// Context provides a convenient interface for handling HTTP requests and responses
+// responseWriter wraps http.ResponseWriter to track response state
+type responseWriter struct {
+	http.ResponseWriter
+	status      int
+	wroteHeader bool
+}
+
+// WriteHeader captures the status code and tracks that headers were written
+func (w *responseWriter) WriteHeader(code int) {
+	if !w.wroteHeader {
+		w.status = code
+		w.wroteHeader = true
+		w.ResponseWriter.WriteHeader(code)
+	}
+}
+
+// Write ensures WriteHeader is called and tracks that response started
+func (w *responseWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+// Status returns the HTTP status code that was written
+func (w *responseWriter) Status() int {
+	return w.status
+}
+
+// Context provides a convenient interface for handling HTTP requests and responses.
+// It wraps http.ResponseWriter and *http.Request with helper methods for common tasks
+// like sending JSON, parsing parameters, setting headers, and storing request-scoped values.
+//
+// Key features:
+//   - Access route parameters: c.Param("id")
+//   - Read query parameters: c.Query("page")
+//   - Send responses: c.JSON(), c.String(), c.HTML()
+//   - Store request-scoped data: c.Set()/c.Get()
+//   - Access raw request/response: c.Request, c.Writer
+//
+// Example:
+//
+//	func handler(c *router.Context) error {
+//	    // Get route parameter
+//	    id := c.Param("id")
+//	
+//	    // Get query parameter with existence check
+//	    if page, ok := c.Query("page"); ok {
+//	        // parameter exists
+//	    }
+//	
+//	    // Store and retrieve values
+//	    c.Set("user_id", 123)
+//	    if userID, ok := c.GetInt("user_id"); ok {
+//	        // value exists and is an int
+//	    }
+//	
+//	    // Send JSON response
+//	    return c.JSON(200, map[string]string{"id": id})
+//	}
 type Context struct {
-	Writer  http.ResponseWriter
+	Writer  *responseWriter
 	Request *http.Request
 	Params  Params
 	store   map[string]interface{}
@@ -19,7 +78,7 @@ type Context struct {
 // newContext creates a new Context instance
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
-		Writer:  w,
+		Writer:  &responseWriter{ResponseWriter: w, status: http.StatusOK},
 		Request: r,
 		Params:  make(Params),
 		store:   make(map[string]interface{}),
@@ -27,23 +86,44 @@ func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	}
 }
 
+// IsHeaderWritten returns true if response headers have been sent to the client.
+// Once headers are written, the status code and headers cannot be changed.
+//
+// This is primarily useful when implementing custom error handlers to avoid
+// attempting to modify the response after headers have been sent:
+//
+//	r.ErrorHandler = func(c *Context, err error) {
+//	    if c.IsHeaderWritten() {
+//	        // Log error, can't modify response
+//	        return
+//	    }
+//	    c.JSON(500, map[string]string{"error": err.Error()})
+//	}
+func (c *Context) IsHeaderWritten() bool {
+	return c.Writer.wroteHeader
+}
+
 // Param returns a route parameter by name
 func (c *Context) Param(name string) string {
 	return c.Params[name]
 }
 
-// Query returns a URL query parameter by name
-func (c *Context) Query(name string) string {
-	return c.Request.URL.Query().Get(name)
+// Query returns a URL query parameter by name.
+// Returns (value, true) if the parameter exists, or ("", false) if it doesn't.
+func (c *Context) Query(name string) (string, bool) {
+	values := c.Request.URL.Query()
+	if !values.Has(name) {
+		return "", false
+	}
+	return values.Get(name), true
 }
 
-// QueryDefault returns a URL query parameter or a default value
+// QueryDefault returns a URL query parameter or a default value if it doesn't exist.
 func (c *Context) QueryDefault(name, defaultValue string) string {
-	value := c.Request.URL.Query().Get(name)
-	if value == "" {
-		return defaultValue
+	if value, ok := c.Query(name); ok {
+		return value
 	}
-	return value
+	return defaultValue
 }
 
 // Set stores a value in the context
@@ -51,33 +131,32 @@ func (c *Context) Set(key string, value interface{}) {
 	c.store[key] = value
 }
 
-// Get retrieves a value from the context
-func (c *Context) Get(key string) interface{} {
-	return c.store[key]
+// Get retrieves a value from the context.
+// Returns (value, true) if the key exists, or (nil, false) if it doesn't.
+func (c *Context) Get(key string) (interface{}, bool) {
+	val, ok := c.store[key]
+	return val, ok
 }
 
-// GetString retrieves a string value from the context
-func (c *Context) GetString(key string) string {
-	if val, ok := c.store[key].(string); ok {
-		return val
-	}
-	return ""
+// GetString retrieves a string value from the context.
+// Returns (value, true) if the key exists and is a string, or ("", false) otherwise.
+func (c *Context) GetString(key string) (string, bool) {
+	val, ok := c.store[key].(string)
+	return val, ok
 }
 
-// GetInt retrieves an int value from the context
-func (c *Context) GetInt(key string) int {
-	if val, ok := c.store[key].(int); ok {
-		return val
-	}
-	return 0
+// GetInt retrieves an int value from the context.
+// Returns (value, true) if the key exists and is an int, or (0, false) otherwise.
+func (c *Context) GetInt(key string) (int, bool) {
+	val, ok := c.store[key].(int)
+	return val, ok
 }
 
-// GetBool retrieves a bool value from the context
-func (c *Context) GetBool(key string) bool {
-	if val, ok := c.store[key].(bool); ok {
-		return val
-	}
-	return false
+// GetBool retrieves a bool value from the context.
+// Returns (value, true) if the key exists and is a bool, or (false, false) otherwise.
+func (c *Context) GetBool(key string) (bool, bool) {
+	val, ok := c.store[key].(bool)
+	return val, ok
 }
 
 // JSON sends a JSON response
@@ -173,6 +252,12 @@ func (c *Context) SetCookie(cookie *http.Cookie) {
 // Status sets the response status code
 func (c *Context) Status(code int) {
 	c.Writer.WriteHeader(code)
+}
+
+// GetStatus returns the HTTP status code that was written (or will be written).
+// Returns 200 if no status has been explicitly set.
+func (c *Context) GetStatus() int {
+	return c.Writer.Status()
 }
 
 // ClientIP returns the client's IP address

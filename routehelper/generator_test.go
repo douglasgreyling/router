@@ -1,4 +1,4 @@
-package router
+package routehelper
 
 import (
 	"os"
@@ -142,54 +142,54 @@ func TestMakeParamNames(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorAddRoute(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestGeneratorAddRoute(t *testing.T) {
+	rh := New()
 
-	cg.AddRoute("home", "/", "GET")
-	cg.AddRoute("user_show", "/users/:id", "GET")
-	cg.AddRoute("user_post", "/users/:user_id/posts/:post_id", "GET")
+	rh.AddRoute("home", "/", "GET")
+	rh.AddRoute("user_show", "/users/:id", "GET")
+	rh.AddRoute("user_post", "/users/:user_id/posts/:post_id", "GET")
 
-	if len(cg.routes) != 3 {
-		t.Errorf("expected 3 routes, got %d", len(cg.routes))
+	if len(rh.routes) != 3 {
+		t.Errorf("expected 3 routes, got %d", len(rh.routes))
 	}
 
 	// Check first route
-	if cg.routes[0].Name != "home" {
-		t.Errorf("expected route name 'home', got %q", cg.routes[0].Name)
+	if rh.routes[0].Name != "home" {
+		t.Errorf("expected route name 'home', got %q", rh.routes[0].Name)
 	}
-	if len(cg.routes[0].Parameters) != 0 {
-		t.Errorf("expected 0 parameters for home route, got %d", len(cg.routes[0].Parameters))
+	if len(rh.routes[0].Parameters) != 0 {
+		t.Errorf("expected 0 parameters for home route, got %d", len(rh.routes[0].Parameters))
 	}
 
 	// Check second route
-	if cg.routes[1].Name != "user_show" {
-		t.Errorf("expected route name 'user_show', got %q", cg.routes[1].Name)
+	if rh.routes[1].Name != "user_show" {
+		t.Errorf("expected route name 'user_show', got %q", rh.routes[1].Name)
 	}
-	if len(cg.routes[1].Parameters) != 1 {
-		t.Errorf("expected 1 parameter for user_show route, got %d", len(cg.routes[1].Parameters))
+	if len(rh.routes[1].Parameters) != 1 {
+		t.Errorf("expected 1 parameter for user_show route, got %d", len(rh.routes[1].Parameters))
 	}
-	if cg.routes[1].Parameters[0].Name != "id" {
-		t.Errorf("expected parameter name 'id', got %q", cg.routes[1].Parameters[0].Name)
+	if rh.routes[1].Parameters[0].Name != "id" {
+		t.Errorf("expected parameter name 'id', got %q", rh.routes[1].Parameters[0].Name)
 	}
 
 	// Check third route
-	if len(cg.routes[2].Parameters) != 2 {
-		t.Errorf("expected 2 parameters for user_post route, got %d", len(cg.routes[2].Parameters))
+	if len(rh.routes[2].Parameters) != 2 {
+		t.Errorf("expected 2 parameters for user_post route, got %d", len(rh.routes[2].Parameters))
 	}
 }
 
-func TestPathHelperGeneratorGenerate(t *testing.T) {
-	cg := NewPathHelperGenerator()
-	cg.AddRoute("home", "/", "GET")
-	cg.AddRoute("user_show", "/users/:id", "GET")
-	cg.AddRoute("user_post", "/users/:user_id/posts/:post_id", "GET")
+func TestGeneratorGenerate(t *testing.T) {
+	rh := New()
+	rh.AddRoute("home", "/", "GET")
+	rh.AddRoute("user_show", "/users/:id", "GET")
+	rh.AddRoute("user_post", "/users/:user_id/posts/:post_id", "GET")
 
 	// Create temporary directory
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "routes.go")
 
 	// Generate code
-	err := cg.Generate("routes", outputFile)
+	err := rh.Generate("routes", outputFile)
 	if err != nil {
 		t.Fatalf("Generate failed: %v", err)
 	}
@@ -229,13 +229,13 @@ func TestPathHelperGeneratorGenerate(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorGenerateWithEmptyRoutes(t *testing.T) {
-	cg := NewPathHelperGenerator()
+func TestGeneratorGenerateWithEmptyRoutes(t *testing.T) {
+	rh := New()
 
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "routes.go")
 
-	err := cg.Generate("routes", outputFile)
+	err := rh.Generate("routes", outputFile)
 	if err != nil {
 		t.Fatalf("Generate failed: %v", err)
 	}
@@ -246,16 +246,16 @@ func TestPathHelperGeneratorGenerateWithEmptyRoutes(t *testing.T) {
 	}
 }
 
-func TestPathHelperGeneratorGenerateComplexRoutes(t *testing.T) {
-	cg := NewPathHelperGenerator()
-	cg.AddRoute("multi_param", "/foo/:a/bar/:b/baz/:c", "GET")
-	cg.AddRoute("api_product", "/api/v1/products/:id", "GET")
-	cg.AddRoute("nested_resource", "/orgs/:org_id/teams/:team_id/members/:id", "GET")
+func TestGeneratorGenerateComplexRoutes(t *testing.T) {
+	rh := New()
+	rh.AddRoute("multi_param", "/foo/:a/bar/:b/baz/:c", "GET")
+	rh.AddRoute("api_product", "/api/v1/products/:id", "GET")
+	rh.AddRoute("nested_resource", "/orgs/:org_id/teams/:team_id/members/:id", "GET")
 
 	tmpDir := t.TempDir()
 	outputFile := filepath.Join(tmpDir, "routes.go")
 
-	err := cg.Generate("routes", outputFile)
+	err := rh.Generate("routes", outputFile)
 	if err != nil {
 		t.Fatalf("Generate failed: %v", err)
 	}

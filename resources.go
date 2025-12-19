@@ -1,6 +1,9 @@
 package router
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // Controller defines the interface for RESTful resource controllers
 // Controllers can implement any subset of these methods
@@ -41,47 +44,68 @@ var AllResourceActions = []ResourceAction{
 	DeleteAction,
 }
 
-// ResourceOptions configures which actions to generate for a resource
-type ResourceOptions struct {
-	// Only specifies which actions to include (whitelist)
-	Only []ResourceAction
-
-	// Except specifies which actions to exclude (blacklist)
-	Except []ResourceAction
-
-	// Middleware to apply to all resource routes
-	Middleware []MiddlewareFunc
+// ResourceOption is a functional option for configuring resources
+type ResourceOption interface {
+	applyToResource(*resourceConfig)
 }
 
-// ResourceOption is a functional option for configuring resources
-type ResourceOption func(*ResourceOptions)
+// resourceConfig holds the configuration for a resource
+type resourceConfig struct {
+	only       []ResourceAction
+	except     []ResourceAction
+	middleware []MiddlewareFunc
+}
+
+// resourceOnly is an option that limits actions to include
+type resourceOnly []ResourceAction
+
+func (o resourceOnly) applyToResource(cfg *resourceConfig) {
+	cfg.only = o
+}
 
 // Only limits the resource to only the specified actions
 func Only(actions ...ResourceAction) ResourceOption {
-	return func(opts *ResourceOptions) {
-		opts.Only = actions
-	}
+	return resourceOnly(actions)
+}
+
+// resourceExcept is an option that excludes specific actions
+type resourceExcept []ResourceAction
+
+func (e resourceExcept) applyToResource(cfg *resourceConfig) {
+	cfg.except = e
 }
 
 // Except excludes the specified actions from the resource
 func Except(actions ...ResourceAction) ResourceOption {
-	return func(opts *ResourceOptions) {
-		opts.Except = actions
-	}
+	return resourceExcept(actions)
 }
 
-// WithMiddleware adds middleware to all resource routes
-func WithMiddleware(middleware ...MiddlewareFunc) ResourceOption {
-	return func(opts *ResourceOptions) {
-		opts.Middleware = middleware
+// resourceMiddleware is an option that adds middleware to resource routes
+type resourceMiddleware []MiddlewareFunc
+
+func (m resourceMiddleware) applyToResource(cfg *resourceConfig) {
+	cfg.middleware = append(cfg.middleware, m...)
+}
+
+// WithResourceMiddleware adds middleware to all resource routes
+func WithResourceMiddleware(middleware ...MiddlewareFunc) ResourceOption {
+	return resourceMiddleware(middleware)
+}
+
+// parseResourceOptions extracts configuration from resource options
+func parseResourceOptions(opts []ResourceOption) *resourceConfig {
+	cfg := &resourceConfig{}
+	for _, opt := range opts {
+		opt.applyToResource(cfg)
 	}
+	return cfg
 }
 
 // shouldIncludeAction determines if an action should be included based on Only/Except options
-func (opts *ResourceOptions) shouldIncludeAction(action ResourceAction) bool {
+func (cfg *resourceConfig) shouldIncludeAction(action ResourceAction) bool {
 	// If Only is specified, action must be in the list
-	if len(opts.Only) > 0 {
-		for _, a := range opts.Only {
+	if len(cfg.only) > 0 {
+		for _, a := range cfg.only {
 			if a == action {
 				return true
 			}
@@ -90,8 +114,8 @@ func (opts *ResourceOptions) shouldIncludeAction(action ResourceAction) bool {
 	}
 
 	// If Except is specified, action must NOT be in the list
-	if len(opts.Except) > 0 {
-		for _, a := range opts.Except {
+	if len(cfg.except) > 0 {
+		for _, a := range cfg.except {
 			if a == action {
 				return false
 			}
@@ -132,13 +156,10 @@ func getResourceRoutes(basePath string) []actionRoute {
 //	r.Resources("/posts", &PostController{}, Only(IndexAction, ShowAction))
 //	r.Resources("/comments", &CommentController{}, Except(NewAction, EditAction))
 func (r *Router) Resources(path string, controller Controller, opts ...ResourceOption) {
-	options := &ResourceOptions{}
-	for _, opt := range opts {
-		opt(options)
-	}
+	config := parseResourceOptions(opts)
 
 	// If no Only/Except options are provided, validate that all methods are implemented
-	requireAll := len(options.Only) == 0 && len(options.Except) == 0
+	requireAll := len(config.only) == 0 && len(config.except) == 0
 
 	// Extract resource name from path (e.g., "/todos" -> "todos", "/api/v1/users" -> "users")
 	resourceName := path
@@ -149,21 +170,21 @@ func (r *Router) Resources(path string, controller Controller, opts ...ResourceO
 	routes := getResourceRoutes(path)
 
 	for _, route := range routes {
-		if !options.shouldIncludeAction(route.action) {
+		if !config.shouldIncludeAction(route.action) {
 			continue
 		}
 
 		handler := getControllerHandler(controller, route.action)
 		if handler == nil {
 			if requireAll {
-				panic("controller must implement all ResourceController methods when using Resources() without Only() or Except() options. Missing: " + string(route.action))
+				panic(fmt.Sprintf("controller for resource %q must implement all ResourceController methods when using Resources() without Only() or Except() options. Missing method: %s (required for %s %s)", path, route.action, route.method, route.path))
 			}
 			continue
 		}
 
 		// Generate route name like "todos_index", "todos_show", etc.
 		routeName := resourceName + "_" + string(route.action)
-		r.HandleNamed(route.method, route.path, handler, routeName, options.Middleware...)
+		r.handle(route.method, route.path, handler, routeName, config.middleware...)
 	}
 }
 

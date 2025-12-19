@@ -1,58 +1,150 @@
+// Package router provides a fast, flexible HTTP router with automatic
+// route helper generation, RESTful resource scaffolding, and type-safe
+// middleware composition.
+//
+// Basic Usage:
+//
+//	r := router.New()
+//
+//	r.Get("/users/:id", func(c *router.Context) error {
+//	    id := c.Param("id")
+//	    return c.JSON(200, map[string]string{"id": id})
+//	})
+//
+//	r.Serve() // Starts server on :3000 with route helper generation
+//
+// Features:
+//
+//   - Fast radix tree routing with parameter and wildcard support
+//   - Automatic code generation of type-safe route helpers
+//   - RESTful resource scaffolding (Rails-inspired)
+//   - Flexible middleware with group and route-level composition
+//   - Rich Context API for request/response handling
+//
+// Route Parameters:
+//
+// The router supports two types of dynamic segments:
+//
+//   - Named parameters (:param) match a single path segment
+//   - Wildcards (*wildcard) match everything after the prefix
+//
+// Example:
+//
+//	r.Get("/users/:id", handler)           // Matches: /users/123
+//	r.Get("/files/*filepath", handler)     // Matches: /files/docs/readme.txt
+//
+// Middleware:
+//
+// Middleware can be applied at the router, group, or route level.
+// Middleware is executed in order: global → group → route-specific.
+//
+//	r.Use(loggingMiddleware)  // Applied to all routes (executes first)
+//
+//	api := r.Group("/api", authMiddleware)  // Applied to group (executes second)
+//	api.Get("/users", handler)
+//
+//	r.Get("/public", handler, WithMiddleware(cacheMiddleware))  // Route-specific (executes last)
+//
+// Error Handling:
+//
+// Handlers return errors, which are processed by the ErrorHandler.
+// The default ErrorHandler sends a JSON error response:
+//
+//	r.Get("/users/:id", func(c *Context) error {
+//	    user, err := findUser(c.Param("id"))
+//	    if err != nil {
+//	        return err  // ErrorHandler will process this
+//	    }
+//	    return c.JSON(200, user)
+//	})
+//
+// Customize error handling:
+//
+//	r.ErrorHandler = func(c *Context, err error) {
+//	    if c.IsHeaderWritten() {
+//	        log.Printf("Error after headers sent: %v", err)
+//	        return
+//	    }
+//	    c.JSON(500, map[string]string{"error": err.Error()})
+//	}
+//
+// Generated Route Helpers:
+//
+// The router automatically generates type-safe route helpers in development mode.
+// For a route named "users_show", you can generate URLs like:
+//
+//	import "yourapp/routes"
+//	url := routes.UsersShowPath(id)  // Generates: /users/:id
+//
+// Control generation:
+//
+//	r.Serve()                           // Auto-generate in development
+//	r.Serve(WithGenerateHelpers(false)) // Disable generation
+//	r.Serve(WithRoutesPackage("api"), WithRoutesOutputFile("api/routes.go"))
+//
+// RESTful Resources:
+//
+// The router provides Rails-inspired resource scaffolding:
+//
+//	type PostController struct{}
+//
+//	func (pc *PostController) Index(c *router.Context) error {
+//	    return c.JSON(200, posts)
+//	}
+//
+//	func (pc *PostController) Show(c *router.Context) error {
+//	    id := c.Param("id")
+//	    return c.JSON(200, findPost(id))
+//	}
+//
+//	r.Resources("/posts", &PostController{},
+//	    Only(IndexAction, ShowAction),
+//	)
+//
+// For more examples and documentation, see: https://github.com/douglasgreyling/router
 package router
 
 import (
 	"fmt"
 	"net/http"
 	"os"
-	"strings"
+
+	"router/internal/naming"
+	"router/internal/tree"
+	"router/routehelper"
 )
 
-// HandlerFunc is the function signature for route handlers
+// HandlerFunc is the function signature for route handlers.
+// Handlers receive a Context and return an error. If an error is returned,
+// it will be processed by the router's ErrorHandler.
+//
+// Example:
+//
+//	func myHandler(c *router.Context) error {
+//	    data := map[string]string{"message": "hello"}
+//	    return c.JSON(200, data)
+//	}
 type HandlerFunc func(*Context) error
 
-// MiddlewareFunc is the function signature for middleware
-type MiddlewareFunc func(HandlerFunc) HandlerFunc
-
-// Params holds route parameters extracted from the URL
+// Params holds route parameters extracted from the URL.
+// Parameters are defined in routes using :name syntax.
+//
+// Example:
+//
+//	r.Get("/users/:id/posts/:post_id", func(c *Context) error {
+//	    userID := c.Param("id")        // Access via Context.Param()
+//	    postID := c.Param("post_id")
+//	    return c.String(200, "User: %s, Post: %s", userID, postID)
+//	})
 type Params map[string]string
-
-// nodeType represents the type of node in the radix tree
-type nodeType uint8
-
-const (
-	static   nodeType = iota // static route segment
-	param                    // :param - matches a single segment
-	wildcard                 // *wildcard - matches everything after
-)
-
-// node represents a node in the radix tree
-type node struct {
-	// The path segment this node represents
-	path string
-
-	// Type of node (static, param, wildcard)
-	nType nodeType
-
-	// The full pattern if this node ends a route
-	pattern string
-
-	// Handlers for different HTTP methods
-	handlers map[string]HandlerFunc
-
-	// Child nodes
-	children []*node
-
-	// Parameter name if this is a param or wildcard node
-	paramName string
-
-	// Middleware chain for this specific route
-	middleware []MiddlewareFunc
-}
 
 // Router is the main router structure
 type Router struct {
-	// Root nodes for each HTTP method
-	trees map[string]*node
+	// Route tree for fast lookups
+	tree *tree.Tree
+
+	// Named routes registry
+	names *naming.Registry
 
 	// Global middleware applied to all routes
 	middleware []MiddlewareFunc
@@ -65,27 +157,13 @@ type Router struct {
 
 	// ErrorHandler handles errors returned from handlers
 	ErrorHandler func(*Context, error)
-
-	// Named routes for reverse routing (code generation only)
-	namedRoutes map[string]*namedRoute
-
-	// codegenMode indicates if router is in code generation mode (doesn't serve HTTP)
-	codegenMode bool
-}
-
-// namedRoute stores information about a named route
-type namedRoute struct {
-	name    string
-	pattern string
-	method  string
 }
 
 // New creates a new Router instance
 func New() *Router {
 	return &Router{
-		trees:       make(map[string]*node),
-		namedRoutes: make(map[string]*namedRoute),
-		codegenMode: false,
+		tree:  tree.New(),
+		names: naming.NewRegistry(),
 		NotFound: func(c *Context) error {
 			return c.JSON(http.StatusNotFound, map[string]string{
 				"error": "Not Found",
@@ -97,6 +175,12 @@ func New() *Router {
 			})
 		},
 		ErrorHandler: func(c *Context, err error) {
+			// Can't modify response if headers already sent
+			if c.IsHeaderWritten() {
+				// Log error since we can't send proper error response
+				fmt.Fprintf(os.Stderr, "Error after headers sent: %v\n", err)
+				return
+			}
 			c.JSON(http.StatusInternalServerError, map[string]string{
 				"error": err.Error(),
 			})
@@ -104,262 +188,102 @@ func New() *Router {
 	}
 }
 
-// NewForCodegen creates a router in code generation mode (doesn't serve HTTP)
-func NewForCodegen() *Router {
-	r := New()
-	r.codegenMode = true
-	return r
-}
-
 // Use adds global middleware to the router
 func (r *Router) Use(middleware ...MiddlewareFunc) {
 	r.middleware = append(r.middleware, middleware...)
 }
 
-// Handle registers a new route with the given method and path
-func (r *Router) Handle(method, path string, handler HandlerFunc, middleware ...MiddlewareFunc) {
-	r.HandleNamed(method, path, handler, "", middleware...)
-}
-
-// HandleNamed registers a new named route with the given method and path
-func (r *Router) HandleNamed(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
-	if path[0] != '/' {
-		panic("path must begin with '/'")
+// handle registers a new route with the given method and path.
+// This is an internal method called by HTTP method helpers (Get, Post, etc.).
+// A route name is automatically generated if not provided.
+//
+// Panics if:
+//   - path does not begin with '/'
+//   - path contains duplicate parameter names (e.g., /users/:id/posts/:id)
+func (r *Router) handle(method, path string, handler HandlerFunc, name string, middleware ...MiddlewareFunc) {
+	// Convert middleware to interface{} slice for tree package
+	mw := make([]interface{}, len(middleware))
+	for i, m := range middleware {
+		mw[i] = m
 	}
 
-	if r.trees[method] == nil {
-		r.trees[method] = &node{
-			path:     "/",
-			handlers: make(map[string]HandlerFunc),
-			children: make([]*node, 0),
-		}
+	// Add route to tree
+	if err := r.tree.AddRoute(method, path, handler, mw); err != nil {
+		panic(err.Error())
 	}
-
-	r.addRoute(method, path, handler, middleware)
 
 	// Auto-generate route name if not provided
 	if name == "" {
-		name = generateRouteName(path, method)
+		name = naming.GenerateName(path, method)
 	}
 
 	// Register named route
 	if name != "" {
-		r.addNamedRoute(name, path, method)
+		r.names.Add(name, path, method)
 	}
 }
 
-// NamedRouteOption is a function that sets a route name
-type NamedRouteOption func(*namedRouteConfig)
-
-type namedRouteConfig struct {
-	name string
-}
-
-// WithName sets the name for a route (for reverse routing)
-func WithName(name string) NamedRouteOption {
-	return func(cfg *namedRouteConfig) {
-		cfg.name = name
-	}
-}
-
-// HTTP method helpers with optional naming
-func (r *Router) Get(path string, handler HandlerFunc, opts ...interface{}) {
+// Get registers a GET route with optional configuration.
+//
+// Options can be provided using WithName() and WithMiddleware():
+//
+//	r.Get("/users/:id", handler)
+//	r.Get("/users/:id", handler, WithName("user_show"))
+//	r.Get("/users/:id", handler, WithMiddleware(auth, logging))
+//	r.Get("/users/:id", handler, WithName("user_show"), WithMiddleware(auth))
+//
+// Panics on invalid paths (see handle for details).
+func (r *Router) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("GET", path, handler, name, middleware...)
+	r.handle("GET", path, handler, name, middleware...)
 }
 
-func (r *Router) Post(path string, handler HandlerFunc, opts ...interface{}) {
+// Post registers a POST route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("POST", path, handler, name, middleware...)
+	r.handle("POST", path, handler, name, middleware...)
 }
 
-func (r *Router) Put(path string, handler HandlerFunc, opts ...interface{}) {
+// Put registers a PUT route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("PUT", path, handler, name, middleware...)
+	r.handle("PUT", path, handler, name, middleware...)
 }
 
-func (r *Router) Patch(path string, handler HandlerFunc, opts ...interface{}) {
+// Patch registers a PATCH route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("PATCH", path, handler, name, middleware...)
+	r.handle("PATCH", path, handler, name, middleware...)
 }
 
-func (r *Router) Delete(path string, handler HandlerFunc, opts ...interface{}) {
+// Delete registers a DELETE route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("DELETE", path, handler, name, middleware...)
+	r.handle("DELETE", path, handler, name, middleware...)
 }
 
-func (r *Router) Head(path string, handler HandlerFunc, opts ...interface{}) {
+// Head registers a HEAD route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("HEAD", path, handler, name, middleware...)
+	r.handle("HEAD", path, handler, name, middleware...)
 }
 
-func (r *Router) Options(path string, handler HandlerFunc, opts ...interface{}) {
+// Options registers an OPTIONS route with optional configuration.
+// See Get() for usage examples.
+// Panics on invalid paths (see handle for details).
+func (r *Router) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
-	r.HandleNamed("OPTIONS", path, handler, name, middleware...)
-}
-
-// parseRouteOptions extracts name and middleware from variadic options
-func parseRouteOptions(opts []interface{}) (string, []MiddlewareFunc) {
-	var name string
-	var middleware []MiddlewareFunc
-
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case NamedRouteOption:
-			cfg := &namedRouteConfig{}
-			v(cfg)
-			name = cfg.name
-		case MiddlewareFunc:
-			middleware = append(middleware, v)
-		case string:
-			// Support passing name directly as string
-			name = v
-		}
-	}
-
-	return name, middleware
-}
-
-// addNamedRoute registers a named route for code generation
-func (r *Router) addNamedRoute(name, pattern, method string) {
-	r.namedRoutes[name] = &namedRoute{
-		name:    name,
-		pattern: pattern,
-		method:  method,
-	}
-}
-
-// generateRouteName creates a route name from path and HTTP method
-// Examples:
-//   GET /users -> users_index
-//   GET /users/:id -> users_show
-//   POST /users -> users_create
-//   PUT /users/:id -> users_update
-//   PATCH /users/:id -> users_update
-//   DELETE /users/:id -> users_destroy
-//   GET /api/v1/products/:id -> api_v1_products_show
-func generateRouteName(path, method string) string {
-	// Clean the path: remove leading/trailing slashes and parameters
-	path = strings.Trim(path, "/")
-	if path == "" {
-		return "" // Don't auto-name root path
-	}
-
-	// Split path into segments
-	segments := strings.Split(path, "/")
-	
-	// Build base name from non-parameter segments
-	var baseParts []string
-	hasParams := false
-	
-	for _, segment := range segments {
-		if strings.HasPrefix(segment, ":") {
-			hasParams = true
-			// Skip parameter segments in the base name
-			continue
-		}
-		// Replace hyphens with underscores for valid identifiers
-		cleanSegment := strings.ReplaceAll(segment, "-", "_")
-		baseParts = append(baseParts, cleanSegment)
-	}
-	
-	if len(baseParts) == 0 {
-		return "" // Path only has parameters
-	}
-	
-	baseName := strings.Join(baseParts, "_")
-	
-	// Determine action suffix based on method and whether path has parameters
-	var action string
-	switch method {
-	case "GET":
-		if hasParams {
-			action = "show"
-		} else {
-			action = "index"
-		}
-	case "POST":
-		action = "create"
-	case "PUT", "PATCH":
-		action = "update"
-	case "DELETE":
-		action = "destroy"
-	case "HEAD":
-		if hasParams {
-			action = "show"
-		} else {
-			action = "index"
-		}
-	case "OPTIONS":
-		action = "options"
-	default:
-		action = strings.ToLower(method)
-	}
-	
-	return baseName + "_" + action
-}
-
-// addRoute adds a route to the radix tree
-func (r *Router) addRoute(method, path string, handler HandlerFunc, middleware []MiddlewareFunc) {
-	root := r.trees[method]
-
-	if path == "/" {
-		root.handlers[method] = handler
-		root.pattern = path
-		root.middleware = middleware
-		return
-	}
-
-	// Remove leading and trailing slashes, split path
-	path = strings.Trim(path, "/")
-	segments := strings.Split(path, "/")
-
-	current := root
-	for i, segment := range segments {
-		// Determine node type
-		nType := static
-		paramName := ""
-
-		if len(segment) > 0 {
-			if segment[0] == ':' {
-				nType = param
-				paramName = segment[1:]
-			} else if segment[0] == '*' {
-				nType = wildcard
-				paramName = segment[1:]
-			}
-		}
-
-		// Look for existing child with matching segment
-		var next *node
-		for _, child := range current.children {
-			if child.path == segment && child.nType == nType {
-				next = child
-				break
-			}
-		}
-
-		// Create new node if no match found
-		if next == nil {
-			next = &node{
-				path:      segment,
-				nType:     nType,
-				paramName: paramName,
-				handlers:  make(map[string]HandlerFunc),
-				children:  make([]*node, 0),
-			}
-			current.children = append(current.children, next)
-		}
-
-		// If this is the last segment, set the handler
-		if i == len(segments)-1 {
-			next.handlers[method] = handler
-			next.pattern = "/" + strings.Join(segments, "/")
-			next.middleware = middleware
-		}
-
-		current = next
-	}
+	r.handle("OPTIONS", path, handler, name, middleware...)
 }
 
 // ServeHTTP implements the http.Handler interface
@@ -370,42 +294,42 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// Create context
 	c := newContext(w, req)
 
-	// Get the root node for this method
-	root := r.trees[method]
-
-	var handler HandlerFunc
-	var middleware []MiddlewareFunc
-
-	if root != nil {
-		// Find the matching route
-		handler, c.Params, middleware = r.findRoute(root, path, method)
-	}
+	// Find the matching route
+	handler, params, middlewareList := r.tree.Find(method, path)
 
 	if handler == nil {
 		// Check if route exists for a different method
-		for m := range r.trees {
-			if m != method {
-				h, _, _ := r.findRoute(r.trees[m], path, m)
-				if h != nil {
-					if err := r.MethodNotAllowed(c); err != nil && r.ErrorHandler != nil {
-						r.ErrorHandler(c, err)
-					}
-					return
-				}
+		if r.tree.HasMethod(path) {
+			if err := r.MethodNotAllowed(c); err != nil && r.ErrorHandler != nil {
+				r.ErrorHandler(c, err)
 			}
+			return
 		}
+
 		if err := r.NotFound(c); err != nil && r.ErrorHandler != nil {
 			r.ErrorHandler(c, err)
 		}
 		return
 	}
 
+	// Set params on context
+	c.Params = params
+
+	// Convert handler from interface{}
+	h := handler.(HandlerFunc)
+
+	// Convert middleware from []interface{}
+	routeMiddleware := make([]MiddlewareFunc, len(middlewareList))
+	for i, mw := range middlewareList {
+		routeMiddleware[i] = mw.(MiddlewareFunc)
+	}
+
 	// Build middleware chain (global + route-specific)
-	finalHandler := handler
+	finalHandler := h
 
 	// Apply route-specific middleware first (innermost)
-	for i := len(middleware) - 1; i >= 0; i-- {
-		finalHandler = middleware[i](finalHandler)
+	for i := len(routeMiddleware) - 1; i >= 0; i-- {
+		finalHandler = routeMiddleware[i](finalHandler)
 	}
 
 	// Apply global middleware (outermost)
@@ -419,78 +343,31 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-// findRoute finds a matching route in the tree
-func (r *Router) findRoute(root *node, path, method string) (HandlerFunc, Params, []MiddlewareFunc) {
-	if path == "/" {
-		if handler, ok := root.handlers[method]; ok {
-			return handler, nil, root.middleware
-		}
-		return nil, nil, nil
-	}
-
-	path = strings.Trim(path, "/")
-	segments := strings.Split(path, "/")
-	params := make(Params)
-
-	handler, middleware := r.search(root, segments, 0, params, method)
-	return handler, params, middleware
-}
-
-// search recursively searches for a matching route
-func (r *Router) search(n *node, segments []string, index int, params Params, method string) (HandlerFunc, []MiddlewareFunc) {
-	// If we've matched all segments, check if this node has a handler
-	if index == len(segments) {
-		if handler, ok := n.handlers[method]; ok {
-			return handler, n.middleware
-		}
-		return nil, nil
-	}
-
-	segment := segments[index]
-
-	// Try children in order: static > param > wildcard
-	for _, child := range n.children {
-		switch child.nType {
-		case static:
-			if child.path == segment {
-				if handler, middleware := r.search(child, segments, index+1, params, method); handler != nil {
-					return handler, middleware
-				}
-			}
-		case param:
-			params[child.paramName] = segment
-			if handler, middleware := r.search(child, segments, index+1, params, method); handler != nil {
-				return handler, middleware
-			}
-			delete(params, child.paramName) // backtrack
-		case wildcard:
-			// Wildcard matches everything remaining
-			params[child.paramName] = strings.Join(segments[index:], "/")
-			if handler, ok := child.handlers[method]; ok {
-				return handler, child.middleware
-			}
-		}
-	}
-
-	return nil, nil
-}
-
 // GenerateRoutes generates type-safe route helpers
 func (r *Router) GenerateRoutes(packageName, outputFile string) error {
-	cg := NewPathHelperGenerator()
+	rh := routehelper.New()
+
+	// Get all named routes
+	namedRoutes := r.names.All()
 
 	// print out all named routes
-	fmt.Printf("Generating route helpers for %d named routes...\n", len(r.namedRoutes))
+	fmt.Printf("Generating route helpers for %d named routes...\n", len(namedRoutes))
 
-	for name, route := range r.namedRoutes {
-		cg.AddRoute(name, route.pattern, route.method)
+	for name, route := range namedRoutes {
+		rh.AddRoute(name, route.Pattern, route.Method)
 	}
-	return cg.Generate(packageName, outputFile)
+	return rh.Generate(packageName, outputFile)
+}
+
+// NamedRoutes returns all named routes (useful for testing and introspection)
+func (r *Router) NamedRoutes() map[string]*naming.Route {
+	return r.names.All()
 }
 
 // ServeConfig holds configuration for the Serve method
 type ServeConfig struct {
 	Addr             string
+	GenerateRoutes   bool
 	RoutesPackage    string
 	RoutesOutputFile string
 }
@@ -502,6 +379,15 @@ type ServeOption func(*ServeConfig)
 func WithAddr(addr string) ServeOption {
 	return func(c *ServeConfig) {
 		c.Addr = addr
+	}
+}
+
+// WithGenerateHelpers enables route helper code generation on server start.
+// By default, helpers are generated automatically in development mode (when ROUTER_ENV != "production").
+// Use this option to explicitly control route helper generation.
+func WithGenerateHelpers(enabled bool) ServeOption {
+	return func(c *ServeConfig) {
+		c.GenerateRoutes = enabled
 	}
 }
 
@@ -519,42 +405,53 @@ func WithRoutesOutputFile(file string) ServeOption {
 	}
 }
 
-// Serve starts the HTTP server with optional configuration
-// Defaults: addr=":3000", routesPackage="routes", routesOutputFile="routes/generated.go"
+// listenAndServe is an internal helper that starts the HTTP server.
+// Users should use Serve() instead, or http.ListenAndServe(addr, router) for direct control.
+func (r *Router) listenAndServe(addr string) error {
+	return http.ListenAndServe(addr, r)
+}
+
+// Serve starts the HTTP server with optional configuration and automatic route generation.
+// By default, route helpers are generated in development mode (ROUTER_ENV != "production").
+//
+// Defaults:
+//   - addr: ":3000"
+//   - generateRoutes: true in development, false in production
+//   - routesPackage: "routes"
+//   - routesOutputFile: "routes/generated.go"
+//
 // Usage:
 //
-//	r.Serve()                                              // Use all defaults
-//	r.Serve(WithAddr(":8080"))                             // Custom port only
-//	r.Serve(WithAddr(":8080"), WithRoutesPackage("myroutes")) // Multiple options
+//	r.Serve()                                          // Use all defaults
+//	r.Serve(WithAddr(":8080"))                         // Custom port
+//	r.Serve(WithGenerateHelpers(false))                // Disable helper generation
+//	r.Serve(WithAddr(":8080"), WithGenerateHelpers(true)) // Production with helper generation
 func (r *Router) Serve(opts ...ServeOption) error {
+	env := os.Getenv("ROUTER_ENV")
+	isProduction := env == "production"
+
 	// Apply defaults
 	config := &ServeConfig{
 		Addr:             ":3000",
+		GenerateRoutes:   !isProduction, // Auto-generate in development
 		RoutesPackage:    "routes",
 		RoutesOutputFile: "routes/generated.go",
 	}
 
-	// Apply options
+	// Apply user options (can override defaults)
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	env := os.Getenv("ROUTER_ENV")
-	if env == "" {
-		env = "development"
-	}
-
-	if env != "production" {
-		fmt.Printf("Starting router in '%s' mode\n", env)
-		fmt.Println("Generating routes...")
+	// Generate route helpers if enabled
+	if config.GenerateRoutes {
+		fmt.Println("Generating route helpers...")
 		if err := r.GenerateRoutes(config.RoutesPackage, config.RoutesOutputFile); err != nil {
 			return fmt.Errorf("failed to generate routes: %w", err)
 		}
 		fmt.Println("Route generation complete!")
-	} else {
-		fmt.Printf("Starting router in %s mode\n", env)
 	}
 
 	fmt.Printf("Starting server on http://localhost%s\n", config.Addr)
-	return http.ListenAndServe(config.Addr, r)
+	return r.listenAndServe(config.Addr)
 }

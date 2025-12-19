@@ -9,12 +9,11 @@ import (
 func TestNamedRoutes(t *testing.T) {
 	r := New()
 
-	// Test with name as string
+	// Test with WithName option
 	r.Get("/users/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "user_show")
+	}, WithName("user_show"))
 
-	// Test with WithName option
 	r.Get("/posts/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
 	}, WithName("post_show"))
@@ -25,17 +24,18 @@ func TestNamedRoutes(t *testing.T) {
 	})
 
 	// Verify routes are registered
-	if r.namedRoutes["user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_show"] == nil {
 		t.Error("user_show route not registered")
 	}
 
-	if r.namedRoutes["post_show"] == nil {
+	if namedRoutes["post_show"] == nil {
 		t.Error("post_show route not registered")
 	}
 
 	// Verify route patterns
-	if r.namedRoutes["user_show"].pattern != "/users/:id" {
-		t.Errorf("expected /users/:id, got %s", r.namedRoutes["user_show"].pattern)
+	if namedRoutes["user_show"].Pattern != "/users/:id" {
+		t.Errorf("expected /users/:id, got %s", namedRoutes["user_show"].Pattern)
 	}
 }
 
@@ -50,10 +50,10 @@ func TestNamedRoutesWithMiddleware(t *testing.T) {
 		}
 	}
 
-	// Use HandleNamed directly for explicit middleware + name
-	r.HandleNamed("GET", "/users/:id", func(c *Context) error {
+	// Use type-safe options for middleware + name
+	r.Get("/users/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "user_show", middleware)
+	}, WithName("user_show"), WithMiddleware(middleware))
 
 	// Verify route works
 	req := httptest.NewRequest("GET", "/users/123", nil)
@@ -65,7 +65,8 @@ func TestNamedRoutesWithMiddleware(t *testing.T) {
 	}
 
 	// Verify route is registered
-	if r.namedRoutes["user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_show"] == nil {
 		t.Error("user_show route not registered")
 	}
 }
@@ -76,23 +77,24 @@ func TestNamedRoutesInGroups(t *testing.T) {
 
 	api.Get("/users/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "api_user_show")
+	}, WithName("api_user_show"))
 
 	api.Get("/posts/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
 	}, WithName("api_post_show"))
 
 	// Verify routes are registered with full path
-	if r.namedRoutes["api_user_show"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["api_user_show"] == nil {
 		t.Error("api_user_show route not registered")
 	}
 
-	if r.namedRoutes["api_user_show"].pattern != "/api/v1/users/:id" {
-		t.Errorf("expected /api/v1/users/:id, got %s", r.namedRoutes["api_user_show"].pattern)
+	if namedRoutes["api_user_show"].Pattern != "/api/v1/users/:id" {
+		t.Errorf("expected /api/v1/users/:id, got %s", namedRoutes["api_user_show"].Pattern)
 	}
 
-	if r.namedRoutes["api_post_show"].pattern != "/api/v1/posts/:id" {
-		t.Errorf("expected /api/v1/posts/:id, got %s", r.namedRoutes["api_post_show"].pattern)
+	if namedRoutes["api_post_show"].Pattern != "/api/v1/posts/:id" {
+		t.Errorf("expected /api/v1/posts/:id, got %s", namedRoutes["api_post_show"].Pattern)
 	}
 }
 
@@ -104,28 +106,29 @@ func TestNamedRoutesMultipleParams(t *testing.T) {
 			"user_id": c.Param("user_id"),
 			"post_id": c.Param("post_id"),
 		})
-	}, "user_post")
+	}, WithName("user_post"))
 
 	// Verify route is registered
-	if r.namedRoutes["user_post"] == nil {
+	namedRoutes := r.NamedRoutes()
+	if namedRoutes["user_post"] == nil {
 		t.Error("user_post route not registered")
 	}
 
-	if r.namedRoutes["user_post"].pattern != "/users/:user_id/posts/:post_id" {
-		t.Errorf("expected /users/:user_id/posts/:post_id, got %s", r.namedRoutes["user_post"].pattern)
+	if namedRoutes["user_post"].Pattern != "/users/:user_id/posts/:post_id" {
+		t.Errorf("expected /users/:user_id/posts/:post_id, got %s", namedRoutes["user_post"].Pattern)
 	}
 }
 
 func TestNamedRoutesAllMethods(t *testing.T) {
 	r := New()
 
-	r.Get("/items/:id", func(c *Context) error { return nil }, "item_show")
-	r.Post("/items", func(c *Context) error { return nil }, "item_create")
-	r.Put("/items/:id", func(c *Context) error { return nil }, "item_update")
-	r.Patch("/items/:id", func(c *Context) error { return nil }, "item_patch")
-	r.Delete("/items/:id", func(c *Context) error { return nil }, "item_delete")
-	r.Head("/items/:id", func(c *Context) error { return nil }, "item_head")
-	r.Options("/items/:id", func(c *Context) error { return nil }, "item_options")
+	r.Get("/items/:id", func(c *Context) error { return nil }, WithName("item_show"))
+	r.Post("/items", func(c *Context) error { return nil }, WithName("item_create"))
+	r.Put("/items/:id", func(c *Context) error { return nil }, WithName("item_update"))
+	r.Patch("/items/:id", func(c *Context) error { return nil }, WithName("item_patch"))
+	r.Delete("/items/:id", func(c *Context) error { return nil }, WithName("item_delete"))
+	r.Head("/items/:id", func(c *Context) error { return nil }, WithName("item_head"))
+	r.Options("/items/:id", func(c *Context) error { return nil }, WithName("item_options"))
 
 	tests := []struct {
 		name     string
@@ -143,15 +146,16 @@ func TestNamedRoutesAllMethods(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			route := r.namedRoutes[tt.name]
+			namedRoutes := r.NamedRoutes()
+			route := namedRoutes[tt.name]
 			if route == nil {
 				t.Fatalf("route %s not registered", tt.name)
 			}
-			if route.pattern != tt.expected {
-				t.Errorf("expected pattern %s, got %s", tt.expected, route.pattern)
+			if route.Pattern != tt.expected {
+				t.Errorf("expected pattern %s, got %s", tt.expected, route.Pattern)
 			}
-			if route.method != tt.method {
-				t.Errorf("expected method %s, got %s", tt.method, route.method)
+			if route.Method != tt.method {
+				t.Errorf("expected method %s, got %s", tt.method, route.Method)
 			}
 		})
 	}
