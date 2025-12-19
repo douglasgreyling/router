@@ -391,6 +391,15 @@ func WithGenerateHelpers(enabled bool) ServeOption {
 	}
 }
 
+// WithGenerateHelpers enables route helper code generation on server start.
+// By default, helpers are generated automatically in development mode (when ROUTER_ENV != "production").
+// Use this option to explicitly control route helper generation.
+func WithGenerateHelpers(enabled bool) ServeOption {
+	return func(c *ServeConfig) {
+		c.GenerateRoutes = enabled
+	}
+}
+
 // WithRoutesPackage sets the routes package name for code generation
 func WithRoutesPackage(pkg string) ServeOption {
 	return func(c *ServeConfig) {
