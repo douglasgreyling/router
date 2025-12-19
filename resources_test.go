@@ -214,7 +214,7 @@ func TestResourcesWithMiddleware(t *testing.T) {
 
 	r.Resources("/users", controller,
 		Only(IndexAction),
-		WithMiddleware(middleware),
+		WithResourceMiddleware(middleware),
 	)
 
 	req := httptest.NewRequest("GET", "/users", nil)

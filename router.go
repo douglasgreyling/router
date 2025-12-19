@@ -148,76 +148,40 @@ func (r *Router) HandleNamed(method, path string, handler HandlerFunc, name stri
 	}
 }
 
-// NamedRouteOption is a function that sets a route name
-type NamedRouteOption func(*namedRouteConfig)
-
-type namedRouteConfig struct {
-	name string
-}
-
-// WithName sets the name for a route (for reverse routing)
-func WithName(name string) NamedRouteOption {
-	return func(cfg *namedRouteConfig) {
-		cfg.name = name
-	}
-}
-
-// HTTP method helpers with optional naming
-func (r *Router) Get(path string, handler HandlerFunc, opts ...interface{}) {
+// HTTP method helpers with type-safe options
+func (r *Router) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("GET", path, handler, name, middleware...)
 }
 
-func (r *Router) Post(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("POST", path, handler, name, middleware...)
 }
 
-func (r *Router) Put(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("PUT", path, handler, name, middleware...)
 }
 
-func (r *Router) Patch(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("PATCH", path, handler, name, middleware...)
 }
 
-func (r *Router) Delete(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("DELETE", path, handler, name, middleware...)
 }
 
-func (r *Router) Head(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("HEAD", path, handler, name, middleware...)
 }
 
-func (r *Router) Options(path string, handler HandlerFunc, opts ...interface{}) {
+func (r *Router) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	r.HandleNamed("OPTIONS", path, handler, name, middleware...)
-}
-
-// parseRouteOptions extracts name and middleware from variadic options
-func parseRouteOptions(opts []interface{}) (string, []MiddlewareFunc) {
-	var name string
-	var middleware []MiddlewareFunc
-
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case NamedRouteOption:
-			cfg := &namedRouteConfig{}
-			v(cfg)
-			name = cfg.name
-		case MiddlewareFunc:
-			middleware = append(middleware, v)
-		case string:
-			// Support passing name directly as string
-			name = v
-		}
-	}
-
-	return name, middleware
 }
 
 // addNamedRoute registers a named route for code generation

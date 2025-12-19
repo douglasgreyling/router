@@ -70,8 +70,8 @@ func Except(actions ...ResourceAction) ResourceOption {
 	}
 }
 
-// WithMiddleware adds middleware to all resource routes
-func WithMiddleware(middleware ...MiddlewareFunc) ResourceOption {
+// WithResourceMiddleware adds middleware to all resource routes
+func WithResourceMiddleware(middleware ...MiddlewareFunc) ResourceOption {
 	return func(opts *ResourceOptions) {
 		opts.Middleware = middleware
 	}

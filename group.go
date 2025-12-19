@@ -40,38 +40,38 @@ func (g *Group) HandleNamed(method, path string, handler HandlerFunc, name strin
 	g.router.HandleNamed(method, fullPath, handler, name, allMiddleware...)
 }
 
-// HTTP method helpers for groups with optional naming
-func (g *Group) Get(path string, handler HandlerFunc, opts ...interface{}) {
+// HTTP method helpers for groups with type-safe options
+func (g *Group) Get(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("GET", path, handler, name, middleware...)
 }
 
-func (g *Group) Post(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Post(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("POST", path, handler, name, middleware...)
 }
 
-func (g *Group) Put(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Put(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("PUT", path, handler, name, middleware...)
 }
 
-func (g *Group) Patch(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Patch(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("PATCH", path, handler, name, middleware...)
 }
 
-func (g *Group) Delete(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Delete(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("DELETE", path, handler, name, middleware...)
 }
 
-func (g *Group) Head(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Head(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("HEAD", path, handler, name, middleware...)
 }
 
-func (g *Group) Options(path string, handler HandlerFunc, opts ...interface{}) {
+func (g *Group) Options(path string, handler HandlerFunc, opts ...RouteOption) {
 	name, middleware := parseRouteOptions(opts)
 	g.HandleNamed("OPTIONS", path, handler, name, middleware...)
 }

@@ -9,11 +9,6 @@ import (
 func TestNamedRoutes(t *testing.T) {
 	r := New()
 
-	// Test with name as string
-	r.Get("/users/:id", func(c *Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "user_show")
-
 	// Test with WithName option
 	r.Get("/posts/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
@@ -50,10 +45,10 @@ func TestNamedRoutesWithMiddleware(t *testing.T) {
 		}
 	}
 
-	// Use HandleNamed directly for explicit middleware + name
-	r.HandleNamed("GET", "/users/:id", func(c *Context) error {
+	// Use type-safe options for middleware + name
+	r.Get("/users/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "user_show", middleware)
+	}, WithName("user_show"), WithMiddleware(middleware))
 
 	// Verify route works
 	req := httptest.NewRequest("GET", "/users/123", nil)
@@ -76,7 +71,7 @@ func TestNamedRoutesInGroups(t *testing.T) {
 
 	api.Get("/users/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
-	}, "api_user_show")
+	}, WithName("api_user_show"))
 
 	api.Get("/posts/:id", func(c *Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"id": c.Param("id")})
@@ -104,7 +99,7 @@ func TestNamedRoutesMultipleParams(t *testing.T) {
 			"user_id": c.Param("user_id"),
 			"post_id": c.Param("post_id"),
 		})
-	}, "user_post")
+	}, WithName("user_post"))
 
 	// Verify route is registered
 	if r.namedRoutes["user_post"] == nil {
@@ -119,13 +114,13 @@ func TestNamedRoutesMultipleParams(t *testing.T) {
 func TestNamedRoutesAllMethods(t *testing.T) {
 	r := New()
 
-	r.Get("/items/:id", func(c *Context) error { return nil }, "item_show")
-	r.Post("/items", func(c *Context) error { return nil }, "item_create")
-	r.Put("/items/:id", func(c *Context) error { return nil }, "item_update")
-	r.Patch("/items/:id", func(c *Context) error { return nil }, "item_patch")
-	r.Delete("/items/:id", func(c *Context) error { return nil }, "item_delete")
-	r.Head("/items/:id", func(c *Context) error { return nil }, "item_head")
-	r.Options("/items/:id", func(c *Context) error { return nil }, "item_options")
+	r.Get("/items/:id", func(c *Context) error { return nil }, WithName("item_show"))
+	r.Post("/items", func(c *Context) error { return nil }, WithName("item_create"))
+	r.Put("/items/:id", func(c *Context) error { return nil }, WithName("item_update"))
+	r.Patch("/items/:id", func(c *Context) error { return nil }, WithName("item_patch"))
+	r.Delete("/items/:id", func(c *Context) error { return nil }, WithName("item_delete"))
+	r.Head("/items/:id", func(c *Context) error { return nil }, WithName("item_head"))
+	r.Options("/items/:id", func(c *Context) error { return nil }, WithName("item_options"))
 
 	tests := []struct {
 		name     string
