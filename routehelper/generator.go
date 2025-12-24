@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 )
@@ -111,6 +112,12 @@ func (g *Generator) Generate(packageName, outputFile string) error {
 	formatted, err := format.Source([]byte(builder.String()))
 	if err != nil {
 		return fmt.Errorf("formatting failed: %w", err)
+	}
+
+	// Create parent directories if they don't exist
+	dir := filepath.Dir(outputFile)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 
 	// Write to file
