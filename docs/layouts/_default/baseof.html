@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ if .Title }}{{ .Title }} | {{ end }}{{ .Site.Title }}</title>
+  <meta name="description" content="{{ .Description | default .Site.Params.description }}">
+  <link rel="stylesheet" href="{{ "assets/css/style.css" | relURL }}">
+</head>
+<body>
+  <header class="header">
+    <div class="header-content">
+      <h1 class="site-title"><a href="{{ "/" | relURL }}">{{ .Site.Title }}</a></h1>
+      <p class="site-description">{{ .Site.Params.description }}</p>
+    </div>
+  </header>
+
+  <nav class="main-nav">
+    <a href="{{ "/" | relURL }}" {{ if .IsHome }}class="active"{{ end }}>Home</a>
+    <a href="{{ "getting-started" | relURL }}" {{ if in .RelPermalink "getting-started" }}class="active"{{ end }}>Getting Started</a>
+    <a href="{{ "guide" | relURL }}" {{ if in .RelPermalink "guide" }}class="active"{{ end }}>Guide</a>
+    <a href="{{ "api-reference" | relURL }}" {{ if in .RelPermalink "api-reference" }}class="active"{{ end }}>API Reference</a>
+    <a href="{{ "examples" | relURL }}" {{ if in .RelPermalink "examples" }}class="active"{{ end }}>Examples</a>
+    <a href="https://github.com/douglasgreyling/router" target="_blank">GitHub</a>
+  </nav>
+
+  <div class="container">
+    {{ if not (eq .Type "home") }}
+    <aside class="sidebar" id="sidebar">
+      <nav class="sidebar-nav">
+        <h4>On This Page</h4>
+        <ul id="toc"></ul>
+      </nav>
+    </aside>
+    {{ end }}
+
+    <main class="content">
+      <article>
+        {{ block "main" . }}{{ end }}
+      </article>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>&copy; 2025 Router. Licensed under MIT License.</p>
+    <p>
+      <a href="https://github.com/douglasgreyling/router">GitHub</a> |
+      <a href="https://pkg.go.dev/github.com/douglasgreyling/router">pkg.go.dev</a>
+    </p>
+  </footer>
+
+  <script src="{{ "assets/js/toc.js" | relURL }}"></script>
+</body>
+</html>
