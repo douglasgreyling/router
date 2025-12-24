@@ -109,9 +109,9 @@ import (
 	"net/http"
 	"os"
 
-	"router/internal/naming"
-	"router/internal/tree"
-	"router/routehelper"
+	"github.com/douglasgreyling/router/internal/naming"
+	"github.com/douglasgreyling/router/internal/tree"
+	"github.com/douglasgreyling/router/routehelper"
 )
 
 // HandlerFunc is the function signature for route handlers.
