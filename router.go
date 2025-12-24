@@ -109,9 +109,9 @@ import (
 	"net/http"
 	"os"
 
-	"router/internal/naming"
-	"router/internal/tree"
-	"router/routehelper"
+	"github.com/douglasgreyling/router/internal/naming"
+	"github.com/douglasgreyling/router/internal/tree"
+	"github.com/douglasgreyling/router/routehelper"
 )
 
 // HandlerFunc is the function signature for route handlers.
@@ -379,15 +379,6 @@ type ServeOption func(*ServeConfig)
 func WithPort(port string) ServeOption {
 	return func(c *ServeConfig) {
 		c.Port = port
-	}
-}
-
-// WithGenerateHelpers enables route helper code generation on server start.
-// By default, helpers are generated automatically in development mode (when ROUTER_ENV != "production").
-// Use this option to explicitly control route helper generation.
-func WithGenerateHelpers(enabled bool) ServeOption {
-	return func(c *ServeConfig) {
-		c.GenerateRoutes = enabled
 	}
 }
 
