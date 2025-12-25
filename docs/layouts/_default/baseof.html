@@ -10,13 +10,13 @@
 <body>
   <header class="header">
     <div class="header-content">
-      <h1 class="site-title"><a href="{{ "/" | relURL }}">{{ .Site.Title }}</a></h1>
+      <h1 class="site-title"><a href="{{ .Site.BaseURL }}">{{ .Site.Title }}</a></h1>
       <p class="site-description">{{ .Site.Params.description }}</p>
     </div>
   </header>
 
   <nav class="main-nav">
-    <a href="{{ "/" | relURL }}" {{ if .IsHome }}class="active"{{ end }}>Home</a>
+    <a href="{{ .Site.BaseURL }}" {{ if .IsHome }}class="active"{{ end }}>Home</a>
     <a href="{{ "getting-started" | relURL }}" {{ if in .RelPermalink "getting-started" }}class="active"{{ end }}>Getting Started</a>
     <a href="{{ "handlers" | relURL }}" {{ if in .RelPermalink "handlers" }}class="active"{{ end }}>Handlers</a>
     <a href="{{ "middleware" | relURL }}" {{ if in .RelPermalink "middleware" }}class="active"{{ end }}>Middleware</a>
