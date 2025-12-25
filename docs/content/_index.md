@@ -1,19 +1,19 @@
 ---
-layout: home
 title: Home
+type: home
 ---
 
 # Router
 
-A fast, flexible HTTP router for Go with automatic route helper generation, RESTful resource scaffolding, and type-safe middleware composition.
+A Rails-inspired, fast, flexible HTTP router for Go with automatic route helper generation, RESTful resource scaffolding, and type-safe middleware composition.
 
 ## Features
 
 - 🚀 **Fast radix tree routing** with parameter and wildcard support
 - 🔧 **Automatic code generation** of type-safe route helpers
-- 📦 **RESTful resource scaffolding** (Rails-inspired)
+- 📦 **RESTful resource scaffolding** inspired by Rails
 - 🎯 **Flexible middleware** with group and route-level composition
-- 💎 **Rich Context API** for request/response handling
+- 💎 **Rich Context API** for simpler request/response handling
 
 ## Quick Start
 
@@ -43,8 +43,9 @@ go get github.com/douglasgreyling/router
 ## Documentation
 
 - [Getting Started](getting-started) - Installation and basic usage
-- [User Guide](guide) - Comprehensive feature guide
-- [API Reference](api-reference) - Detailed API documentation
+- [Handlers](handlers) - Comprehensive guide on routing with handlers
+- [Middleware](middleware) - Comprehensive guide on middleware usage
+- [Configuration](configuration) - Details on router configuration options
 - [Examples](examples) - Real-world examples
 
 ## Community

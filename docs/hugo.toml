@@ -1,0 +1,26 @@
+baseURL = "https://douglasgreyling.github.io/router/"
+languageCode = "en-us"
+title = "Router"
+
+[params]
+  description = "A Rails-inspired, fast, flexible HTTP router for Go with automatic route helper generation"
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+  [markup.highlight]
+    style = "monokai"
+    lineNos = false
+    lineNumbersInTable = false
+
+[module]
+  [[module.mounts]]
+    source = "static"
+    target = "static"
+  [[module.mounts]]
+    source = "content"
+    target = "content"
+
+# Disable taxonomy pages
+disableKinds = ["taxonomy", "term"]
