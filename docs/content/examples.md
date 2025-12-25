@@ -469,7 +469,7 @@ func main() {
 
     // Start server
     log.Println("Server starting on :3000")
-    r.Serve(router.WithPort(3000))
+    r.Serve(router.WithPort(":3000"))
 }
 ```
 

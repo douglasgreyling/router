@@ -18,8 +18,9 @@
   <nav class="main-nav">
     <a href="{{ "/" | relURL }}" {{ if .IsHome }}class="active"{{ end }}>Home</a>
     <a href="{{ "getting-started" | relURL }}" {{ if in .RelPermalink "getting-started" }}class="active"{{ end }}>Getting Started</a>
-    <a href="{{ "guide" | relURL }}" {{ if in .RelPermalink "guide" }}class="active"{{ end }}>Guide</a>
-    <a href="{{ "api-reference" | relURL }}" {{ if in .RelPermalink "api-reference" }}class="active"{{ end }}>API Reference</a>
+    <a href="{{ "handlers" | relURL }}" {{ if in .RelPermalink "handlers" }}class="active"{{ end }}>Handlers</a>
+    <a href="{{ "middleware" | relURL }}" {{ if in .RelPermalink "middleware" }}class="active"{{ end }}>Middleware</a>
+    <a href="{{ "configuration" | relURL }}" {{ if in .RelPermalink "configuration" }}class="active"{{ end }}>Configuration</a>
     <a href="{{ "examples" | relURL }}" {{ if in .RelPermalink "examples" }}class="active"{{ end }}>Examples</a>
     <a href="https://github.com/douglasgreyling/router" target="_blank">GitHub</a>
   </nav>

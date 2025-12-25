@@ -139,14 +139,6 @@ Customize server options:
 
 ```go
 r.Serve(
-    router.WithPort(8080),
-    router.WithGenerateHelpers(false),
+    router.WithPort(":8080"),
 )
 ```
-
-## Next Steps
-
-- Learn about [Middleware](guide#middleware)
-- Explore [RESTful Resources](guide#restful-resources)
-- Understand [Route Helpers](guide#route-helpers)
-- See [Real-world Examples](examples)
